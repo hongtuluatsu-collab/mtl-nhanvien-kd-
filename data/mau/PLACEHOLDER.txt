@@ -1,0 +1,12 @@
+Thư mục này chứa ảnh thương hiệu MTL dùng trong file Word xuất ra.
+
+Cần copy thủ công từ dự án chính:
+  - LOGO.jpg       (logo MTL, kích thước 1272x838)
+  - QR_CTY_LMT.jpg (QR MB Bank thanh toán)
+
+Lệnh copy:
+  copy D:\tro-ly-phap-ly-1\data\mau\LOGO.jpg        .\LOGO.jpg
+  copy D:\tro-ly-phap-ly-1\data\mau\QR_CTY_LMT.jpg  .\QR_CTY_LMT.jpg
+
+Lưu ý: file ảnh KHÔNG upload lên Git (đã có trong .gitignore).
+Khi deploy Railway cần upload qua Railway Volume hoặc nhúng base64 vào code.

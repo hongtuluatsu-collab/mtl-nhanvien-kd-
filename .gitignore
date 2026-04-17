@@ -1,0 +1,30 @@
+# Môi trường
+.env
+*.env
+
+# Data khách hàng (không commit lên Git)
+data/crm.json
+data/hop_dong/
+data/mau/LOGO.jpg
+data/mau/QR_CTY_LMT.jpg
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

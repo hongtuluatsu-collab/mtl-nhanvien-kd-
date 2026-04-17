@@ -1,0 +1,9 @@
+{
+  "name": "mtl-nhanvien-kd",
+  "version": "1.0.0",
+  "description": "MTL Word export scripts",
+  "private": true,
+  "dependencies": {
+    "docx": "^8.5.0"
+  }
+}
