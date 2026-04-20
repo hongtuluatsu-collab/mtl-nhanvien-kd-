@@ -849,115 +849,115 @@ Soạn đủ 10 điều khoản. Không dùng markdown, #, *, **.
 # TAB 3 — CRM
 # ══════════════════════════════════════════════
 if can_see_crm and tab_crm is not None:
- with tab_crm:
-    st.markdown("### CRM Khách Hàng")
-    st.caption("Lưu trữ & quản lý hồ sơ · Đồng bộ Google Drive")
-    st.divider()
-
-    crm=st.session_state.crm
-    total=len(crm); with_hd=sum(1 for k in crm if k.get("trang_thai")=="hopdong")
-    revenue=sum(int(k.get("phi") or 0) for k in crm)
-    st.markdown(f"""
-    <div class="stat-row">
-      <div class="stat-box"><div class="stat-val">{total}</div><div class="stat-lbl">Tổng khách hàng</div></div>
-      <div class="stat-box"><div class="stat-val">{with_hd}</div><div class="stat-lbl">Đã ký hợp đồng</div></div>
-      <div class="stat-box"><div class="stat-val">{revenue//1_000_000}</div><div class="stat-lbl">Doanh thu (tr.đ)</div></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    sc1,sc2,sc3,sc4=st.columns([3,1,1,1])
-    with sc1: search_q=st.text_input("🔍 Tìm kiếm",placeholder="Tên, SĐT, email...",label_visibility="collapsed")
-    with sc2: flt=st.selectbox("Lọc",["Tất cả","Tiềm năng","Báo giá","Hợp đồng"],label_visibility="collapsed")
-    with sc3: show_add=st.button("＋ Thêm KH",use_container_width=True)
-    with sc4:
-        if crm:
-            csv_buf=io.StringIO(); writer=csv.writer(csv_buf)
-            writer.writerow(["Tên","SĐT","Email","Địa chỉ","Dịch vụ","Phí","Mã BG","Ngày BG","Số HĐ","Trạng thái"])
-            for k in crm:
-                hd=k.get("hop_dong") or {}
-                writer.writerow([k.get("ten",""),k.get("sdt",""),k.get("email",""),k.get("diachi",""),
-                                  k.get("loai",""),k.get("phi",""),k.get("ma_bg",""),k.get("ngay_bg",""),
-                                  hd.get("so_hd",""),k.get("trang_thai","")])
-            st.download_button("↓ CSV",csv_buf.getvalue().encode("utf-8-sig"),"CRM_MinhTuLaw.csv","text/csv",use_container_width=True)
-
-    if show_add: st.session_state["show_add_form"]=True
-    if st.session_state.get("show_add_form"):
-        with st.expander("➕ Thêm khách hàng mới",expanded=True):
-            with st.form("form_add_crm"):
-                a1,a2=st.columns(2)
-                with a1: add_ten=st.text_input("Họ tên *"); add_email=st.text_input("Email"); add_loai=st.text_input("Loại dịch vụ")
-                with a2: add_sdt=st.text_input("Điện thoại"); add_diachi=st.text_input("Địa chỉ"); add_phi=st.text_input("Phí dự kiến (VNĐ)")
-                add_ghichu=st.text_area("Ghi chú",height=70)
-                add_ts=st.selectbox("Trạng thái",["tiemnang","baogia","hopdong"])
-                if st.form_submit_button("Lưu",type="primary"):
-                    if not add_ten.strip(): st.error("Vui lòng nhập tên khách hàng.")
-                    else:
-                        new_kh={"id":str(int(datetime.now().timestamp()*1000)),"ten":add_ten,"sdt":add_sdt,
-                                "email":add_email,"diachi":add_diachi,"loai":add_loai,
-                                "phi":re.sub(r"\D","",add_phi),"duan":"","ghichu":add_ghichu,
-                                "ma_bg":"","ngay_bg":today_str(),"trang_thai":add_ts,"hop_dong":None,
-                                "created_at":datetime.now().isoformat()}
-                        crm.insert(0,new_kh); st.session_state.crm=crm; save_crm(crm)
-                        write_log(current_user,"THEM_KH_CRM",f"KH mới: {add_ten}")
-                        st.session_state["show_add_form"]=False; st.success("Đã thêm khách hàng!"); st.rerun()
-
-    flt_map={"Tất cả":"all","Tiềm năng":"tiemnang","Báo giá":"baogia","Hợp đồng":"hopdong"}
-    flt_key=flt_map[flt]; filtered=crm
-    if search_q:
-        q=search_q.lower()
-        filtered=[k for k in filtered if q in k.get("ten","").lower() or q in k.get("sdt","").lower()
-                  or q in k.get("email","").lower() or q in k.get("loai","").lower()]
-    if flt_key!="all": filtered=[k for k in filtered if k.get("trang_thai")==flt_key]
-
-    if not filtered: st.info("Không có khách hàng nào." if not crm else "Không tìm thấy kết quả.")
-    else:
-        h1,h2,h3,h4,h5,h6,h7=st.columns([3,2,2,2,2,2,1])
-        for col,label in zip([h1,h2,h3,h4,h5,h6,h7],["Khách hàng","Liên hệ","Dịch vụ","Phí (VNĐ)","Hợp đồng","Trạng thái","#"]):
-            col.markdown(f"**{label}**")
+    with tab_crm:
+        st.markdown("### CRM Khách Hàng")
+        st.caption("Lưu trữ & quản lý hồ sơ · Đồng bộ Google Drive")
         st.divider()
-        for kh in filtered:
-            hd=kh.get("hop_dong") or {}
-            phi_disp=f"{int(kh.get('phi') or 0):,}".replace(",",".")
-            ts=kh.get("trang_thai","")
-            badge={"hopdong":"badge-green","baogia":"badge-gold","tiemnang":"badge-navy"}.get(ts,"badge-gray")
-            c1,c2,c3,c4,c5,c6,c7=st.columns([3,2,2,2,2,2,1])
-            with c1: st.markdown(f"**{kh['ten']}**"); st.caption(kh.get("ma_bg",""))
-            with c2: st.markdown(kh.get("sdt","—")); st.caption(kh.get("email",""))
-            with c3: st.markdown(f"_{kh.get('loai','—')[:30]}_")
-            with c4: st.markdown(f"**{phi_disp}**")
-            with c5:
-                if hd: st.markdown(f"`{hd.get('so_hd','')}`"); st.caption(hd.get("ngay_hd",""))
-                else: st.markdown("—")
-            with c6: st.markdown(f'<span class="{badge}">{status_label(ts)}</span>',unsafe_allow_html=True)
-            with c7:
-                with st.popover("•••"):
-                    st.markdown(f"**{kh['ten']}**")
-                    st.caption(f"SĐT: {kh.get('sdt','—')} | Email: {kh.get('email','—')}")
-                    st.caption(f"Địa chỉ: {kh.get('diachi','—')}")
-                    st.caption(f"Phí: {phi_disp}đ | Loại: {kh.get('loai','—')}")
-                    if kh.get("ghichu"): st.caption(f"Ghi chú: {kh['ghichu'][:200]}")
-                    st.divider()
-                    new_ts=st.selectbox("Đổi trạng thái",["tiemnang","baogia","hopdong"],
-                        index=["tiemnang","baogia","hopdong"].index(ts) if ts in ["tiemnang","baogia","hopdong"] else 0,
-                        key=f"ts_{kh['id']}")
-                    if st.button("Cập nhật",key=f"upd_{kh['id']}"):
-                        idx=next(i for i,k in enumerate(crm) if k["id"]==kh["id"])
-                        crm[idx]["trang_thai"]=new_ts; st.session_state.crm=crm; save_crm(crm)
-                        write_log(current_user,"CAP_NHAT_KH",f"KH: {kh['ten']} → {new_ts}"); st.rerun()
-                    if st.button("Tạo HĐ từ KH này",key=f"hd_{kh['id']}",type="primary"):
-                        st.session_state["_prefill_hd"]={"ten":kh.get("ten",""),"sdt":kh.get("sdt",""),
-                            "email":kh.get("email",""),"diachi":kh.get("diachi",""),
-                            "loai":kh.get("loai",""),"phi":kh.get("phi",""),"mota":kh.get("ghichu","")}
-                        st.info("Chuyển sang tab **Tạo Hợp Đồng**")
-                    if st.button("💳 Tạo ĐNTT",key=f"dntt_{kh['id']}"):
-                        st.session_state["_prefill_dntt"]=kh; st.info("Chuyển sang tab **Đề Nghị Thanh Toán**")
-                    if st.button("🧾 Tạo Phiếu Thu",key=f"pt_{kh['id']}"):
-                        st.session_state["_prefill_pt"]=kh; st.info("Chuyển sang tab **Phiếu Thu**")
-                    if st.button("🗑 Xóa",key=f"del_{kh['id']}",type="secondary"):
-                        crm[:]=[k for k in crm if k["id"]!=kh["id"]]
-                        st.session_state.crm=crm; save_crm(crm)
-                        write_log(current_user,"XOA_KH",f"KH: {kh['ten']}"); st.rerun()
+
+        crm=st.session_state.crm
+        total=len(crm); with_hd=sum(1 for k in crm if k.get("trang_thai")=="hopdong")
+        revenue=sum(int(k.get("phi") or 0) for k in crm)
+        st.markdown(f"""
+        <div class="stat-row">
+          <div class="stat-box"><div class="stat-val">{total}</div><div class="stat-lbl">Tổng khách hàng</div></div>
+          <div class="stat-box"><div class="stat-val">{with_hd}</div><div class="stat-lbl">Đã ký hợp đồng</div></div>
+          <div class="stat-box"><div class="stat-val">{revenue//1_000_000}</div><div class="stat-lbl">Doanh thu (tr.đ)</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        sc1,sc2,sc3,sc4=st.columns([3,1,1,1])
+        with sc1: search_q=st.text_input("🔍 Tìm kiếm",placeholder="Tên, SĐT, email...",label_visibility="collapsed")
+        with sc2: flt=st.selectbox("Lọc",["Tất cả","Tiềm năng","Báo giá","Hợp đồng"],label_visibility="collapsed")
+        with sc3: show_add=st.button("＋ Thêm KH",use_container_width=True)
+        with sc4:
+            if crm:
+                csv_buf=io.StringIO(); writer=csv.writer(csv_buf)
+                writer.writerow(["Tên","SĐT","Email","Địa chỉ","Dịch vụ","Phí","Mã BG","Ngày BG","Số HĐ","Trạng thái"])
+                for k in crm:
+                    hd=k.get("hop_dong") or {}
+                    writer.writerow([k.get("ten",""),k.get("sdt",""),k.get("email",""),k.get("diachi",""),
+                                      k.get("loai",""),k.get("phi",""),k.get("ma_bg",""),k.get("ngay_bg",""),
+                                      hd.get("so_hd",""),k.get("trang_thai","")])
+                st.download_button("↓ CSV",csv_buf.getvalue().encode("utf-8-sig"),"CRM_MinhTuLaw.csv","text/csv",use_container_width=True)
+
+        if show_add: st.session_state["show_add_form"]=True
+        if st.session_state.get("show_add_form"):
+            with st.expander("➕ Thêm khách hàng mới",expanded=True):
+                with st.form("form_add_crm"):
+                    a1,a2=st.columns(2)
+                    with a1: add_ten=st.text_input("Họ tên *"); add_email=st.text_input("Email"); add_loai=st.text_input("Loại dịch vụ")
+                    with a2: add_sdt=st.text_input("Điện thoại"); add_diachi=st.text_input("Địa chỉ"); add_phi=st.text_input("Phí dự kiến (VNĐ)")
+                    add_ghichu=st.text_area("Ghi chú",height=70)
+                    add_ts=st.selectbox("Trạng thái",["tiemnang","baogia","hopdong"])
+                    if st.form_submit_button("Lưu",type="primary"):
+                        if not add_ten.strip(): st.error("Vui lòng nhập tên khách hàng.")
+                        else:
+                            new_kh={"id":str(int(datetime.now().timestamp()*1000)),"ten":add_ten,"sdt":add_sdt,
+                                    "email":add_email,"diachi":add_diachi,"loai":add_loai,
+                                    "phi":re.sub(r"\D","",add_phi),"duan":"","ghichu":add_ghichu,
+                                    "ma_bg":"","ngay_bg":today_str(),"trang_thai":add_ts,"hop_dong":None,
+                                    "created_at":datetime.now().isoformat()}
+                            crm.insert(0,new_kh); st.session_state.crm=crm; save_crm(crm)
+                            write_log(current_user,"THEM_KH_CRM",f"KH mới: {add_ten}")
+                            st.session_state["show_add_form"]=False; st.success("Đã thêm khách hàng!"); st.rerun()
+
+        flt_map={"Tất cả":"all","Tiềm năng":"tiemnang","Báo giá":"baogia","Hợp đồng":"hopdong"}
+        flt_key=flt_map[flt]; filtered=crm
+        if search_q:
+            q=search_q.lower()
+            filtered=[k for k in filtered if q in k.get("ten","").lower() or q in k.get("sdt","").lower()
+                      or q in k.get("email","").lower() or q in k.get("loai","").lower()]
+        if flt_key!="all": filtered=[k for k in filtered if k.get("trang_thai")==flt_key]
+
+        if not filtered: st.info("Không có khách hàng nào." if not crm else "Không tìm thấy kết quả.")
+        else:
+            h1,h2,h3,h4,h5,h6,h7=st.columns([3,2,2,2,2,2,1])
+            for col,label in zip([h1,h2,h3,h4,h5,h6,h7],["Khách hàng","Liên hệ","Dịch vụ","Phí (VNĐ)","Hợp đồng","Trạng thái","#"]):
+                col.markdown(f"**{label}**")
             st.divider()
+            for kh in filtered:
+                hd=kh.get("hop_dong") or {}
+                phi_disp=f"{int(kh.get('phi') or 0):,}".replace(",",".")
+                ts=kh.get("trang_thai","")
+                badge={"hopdong":"badge-green","baogia":"badge-gold","tiemnang":"badge-navy"}.get(ts,"badge-gray")
+                c1,c2,c3,c4,c5,c6,c7=st.columns([3,2,2,2,2,2,1])
+                with c1: st.markdown(f"**{kh['ten']}**"); st.caption(kh.get("ma_bg",""))
+                with c2: st.markdown(kh.get("sdt","—")); st.caption(kh.get("email",""))
+                with c3: st.markdown(f"_{kh.get('loai','—')[:30]}_")
+                with c4: st.markdown(f"**{phi_disp}**")
+                with c5:
+                    if hd: st.markdown(f"`{hd.get('so_hd','')}`"); st.caption(hd.get("ngay_hd",""))
+                    else: st.markdown("—")
+                with c6: st.markdown(f'<span class="{badge}">{status_label(ts)}</span>',unsafe_allow_html=True)
+                with c7:
+                    with st.popover("•••"):
+                        st.markdown(f"**{kh['ten']}**")
+                        st.caption(f"SĐT: {kh.get('sdt','—')} | Email: {kh.get('email','—')}")
+                        st.caption(f"Địa chỉ: {kh.get('diachi','—')}")
+                        st.caption(f"Phí: {phi_disp}đ | Loại: {kh.get('loai','—')}")
+                        if kh.get("ghichu"): st.caption(f"Ghi chú: {kh['ghichu'][:200]}")
+                        st.divider()
+                        new_ts=st.selectbox("Đổi trạng thái",["tiemnang","baogia","hopdong"],
+                            index=["tiemnang","baogia","hopdong"].index(ts) if ts in ["tiemnang","baogia","hopdong"] else 0,
+                            key=f"ts_{kh['id']}")
+                        if st.button("Cập nhật",key=f"upd_{kh['id']}"):
+                            idx=next(i for i,k in enumerate(crm) if k["id"]==kh["id"])
+                            crm[idx]["trang_thai"]=new_ts; st.session_state.crm=crm; save_crm(crm)
+                            write_log(current_user,"CAP_NHAT_KH",f"KH: {kh['ten']} → {new_ts}"); st.rerun()
+                        if st.button("Tạo HĐ từ KH này",key=f"hd_{kh['id']}",type="primary"):
+                            st.session_state["_prefill_hd"]={"ten":kh.get("ten",""),"sdt":kh.get("sdt",""),
+                                "email":kh.get("email",""),"diachi":kh.get("diachi",""),
+                                "loai":kh.get("loai",""),"phi":kh.get("phi",""),"mota":kh.get("ghichu","")}
+                            st.info("Chuyển sang tab **Tạo Hợp Đồng**")
+                        if st.button("💳 Tạo ĐNTT",key=f"dntt_{kh['id']}"):
+                            st.session_state["_prefill_dntt"]=kh; st.info("Chuyển sang tab **Đề Nghị Thanh Toán**")
+                        if st.button("🧾 Tạo Phiếu Thu",key=f"pt_{kh['id']}"):
+                            st.session_state["_prefill_pt"]=kh; st.info("Chuyển sang tab **Phiếu Thu**")
+                        if st.button("🗑 Xóa",key=f"del_{kh['id']}",type="secondary"):
+                            crm[:]=[k for k in crm if k["id"]!=kh["id"]]
+                            st.session_state.crm=crm; save_crm(crm)
+                            write_log(current_user,"XOA_KH",f"KH: {kh['ten']}"); st.rerun()
+                st.divider()
 
 
 # ══════════════════════════════════════════════
