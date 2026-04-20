@@ -107,26 +107,22 @@ def _get_drive_service():
     try:
         creds_info = json.loads(creds_json)
         creds = service_account.Credentials.from_service_account_info(
-            creds_info,
-            scopes=["https://www.googleapis.com/auth/drive"],
+            creds_info, scopes=["https://www.googleapis.com/auth/drive"],
         )
         return build("drive", "v3", credentials=creds, cache_discovery=False)
     except Exception:
         return None
 
-
 def _find_file_id(service, filename: str):
     try:
         result = service.files().list(
             q=f"name='{filename}' and '{DRIVE_FOLDER_ID}' in parents and trashed=false",
-            fields="files(id)",
-            pageSize=1,
+            fields="files(id)", pageSize=1,
         ).execute()
         files = result.get("files", [])
         return files[0]["id"] if files else None
     except Exception:
         return None
-
 
 def _upload_to_drive(content_bytes: bytes, filename: str, mimetype: str):
     service = _get_drive_service()
@@ -165,16 +161,13 @@ def today_str() -> str:
     return datetime.now().strftime("%d/%m/%Y")
 
 def load_crm() -> list:
-    """Load CRM từ Google Drive, fallback về local."""
     service = _get_drive_service()
     if service:
         try:
             file_id = _find_file_id(service, CRM_FILENAME)
             if file_id:
                 buf = io.BytesIO()
-                downloader = MediaIoBaseDownload(
-                    buf, service.files().get_media(fileId=file_id)
-                )
+                downloader = MediaIoBaseDownload(buf, service.files().get_media(fileId=file_id))
                 done = False
                 while not done:
                     _, done = downloader.next_chunk()
@@ -182,7 +175,6 @@ def load_crm() -> list:
                 return json.loads(buf.read().decode("utf-8"))
         except Exception:
             pass
-    # Fallback local
     try:
         f = Path("data/crm.json")
         f.parent.mkdir(parents=True, exist_ok=True)
@@ -193,16 +185,13 @@ def load_crm() -> list:
     return []
 
 def save_crm(data: list):
-    """Lưu CRM lên Google Drive và local đồng thời."""
     content = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
-    # Local backup
     try:
         f = Path("data/crm.json")
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(content)
     except Exception:
         pass
-    # Google Drive
     _upload_to_drive(content, CRM_FILENAME, "application/json")
 
 def status_label(s: str) -> str:
@@ -227,7 +216,6 @@ def call_claude(prompt: str, max_tokens: int = 2000) -> str:
     return msg.content[0].text
 
 def xuat_word(noi_dung: str, ten_file: str, loai: str = "bao_gia", data_extra: dict = None) -> str:
-    """Gọi Node.js tạo .docx rồi tự động upload lên Google Drive."""
     HOPDONG_DIR.mkdir(parents=True, exist_ok=True)
     payload = {"noi_dung": noi_dung, "ten_file": ten_file, "ngay_lap": today_str()}
     if data_extra:
@@ -250,12 +238,10 @@ def xuat_word(noi_dung: str, ten_file: str, loai: str = "bao_gia", data_extra: d
         if result.returncode == 0 and "OK" in result.stdout:
             try: os.remove(json_path)
             except: pass
-            # Upload lên Google Drive
             try:
                 with open(docx_path, "rb") as f:
                     _upload_to_drive(
-                        f.read(),
-                        f"{ten_file}.docx",
+                        f.read(), f"{ten_file}.docx",
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     )
             except Exception:
@@ -442,7 +428,7 @@ with tab_bg:
         if errors:
             st.error(f"Vui lòng nhập đầy đủ: **{', '.join(errors)}**")
         else:
-            ma_bg = gen_ma_bg()
+            ma_bg     = gen_ma_bg()
             phi_raw   = int(re.sub(r"\D", "", bg_phi) or "0")
             phi_vat   = round(phi_raw * 0.1)
             phi_total = phi_raw + phi_vat
@@ -452,16 +438,13 @@ Mã báo giá: {ma_bg} | Ngày: {today_str()}
 Khách hàng: {bg_ten}
 SĐT: {bg_sdt or '—'} | Email: {bg_email or '—'}
 Địa chỉ: {bg_diachi or '—'}
-Loại vụ: {bg_loai}
-Tên vụ/dự án: {bg_duan or bg_loai}
-Cách tính phí: {bg_cach}
-Mô tả: {bg_mota}
+Loại vụ: {bg_loai} | Tên vụ/dự án: {bg_duan or bg_loai}
+Cách tính phí: {bg_cach} | Mô tả: {bg_mota}
 
-CẤU TRÚC BẮT BUỘC (không dùng bảng ASCII, không dùng markdown table):
-
+CẤU TRÚC BẮT BUỘC:
 I. PHẠM VI DỊCH VỤ
 01. [Tên hạng mục]
-   [Mô tả chi tiết 1–2 câu]
+   [Mô tả 1–2 câu]
 (5–6 hạng mục)
 
 II. BẢNG PHÍ DỊCH VỤ
@@ -560,18 +543,18 @@ with tab_hd:
     st.divider()
 
     prefill = st.session_state.pop("_prefill_hd", {})
-    crm_options = {k["id"]: f"{k['ten']} — {k['sdt'] or k['email'] or ''}"
-                   for k in st.session_state.crm}
-    crm_choice = st.selectbox("Chọn khách hàng từ CRM (tự điền form)",
-        options=["— Chọn từ danh sách —"] + list(crm_options.values()), key="hd_crm_sel")
-    selected_kh = None
-    if crm_choice != "— Chọn từ danh sách —":
-        selected_kh = next((k for k in st.session_state.crm
-            if f"{k['ten']} — {k['sdt'] or k['email'] or ''}" == crm_choice), None)
+    crm_options_hd = {k["id"]: f"{k['ten']} — {k['sdt'] or k['email'] or ''}"
+                      for k in st.session_state.crm}
+    crm_choice_hd = st.selectbox("Chọn khách hàng từ CRM (tự điền form)",
+        options=["— Chọn từ danh sách —"] + list(crm_options_hd.values()), key="hd_crm_sel")
+    selected_kh_hd = None
+    if crm_choice_hd != "— Chọn từ danh sách —":
+        selected_kh_hd = next((k for k in st.session_state.crm
+            if f"{k['ten']} — {k['sdt'] or k['email'] or ''}" == crm_choice_hd), None)
     st.divider()
 
     def _val(field: str, default: str = "") -> str:
-        if selected_kh: return selected_kh.get(field, default) or default
+        if selected_kh_hd: return selected_kh_hd.get(field, default) or default
         return prefill.get(field, default) or default
 
     with st.form("form_hopdong", clear_on_submit=False):
@@ -622,20 +605,16 @@ with tab_hd:
             prompt = f"""Soạn HỢP ĐỒNG DỊCH VỤ PHÁP LÝ đầy đủ theo chuẩn pháp lý Việt Nam:
 
 Số HĐ: {hd_so} | Ngày ký: {today_str()}
-
 BÊN A: CÔNG TY LUẬT TNHH MINH TÚ
   GPĐKHĐ: 41.02.4764/TP/ĐKHĐ | MST: 0318941023
   Đại diện: LS. Võ Hồng Tú — Giám đốc / Luật sư điều hành
   Trụ sở: 4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, TP.HCM
   Chi nhánh Đà Nẵng: 81 Xô Viết Nghệ Tĩnh, P. Cẩm Lệ, TP. Đà Nẵng
   Hotline: 1900 0031 | Email: votu@luatminhtu.vn
-
 BÊN B: {hd_ten}
   CMND/MST: {hd_cmnd or '___'} | Địa chỉ: {hd_diachi or '___'}
   SĐT: {hd_sdt or '___'} | Email: {hd_email or '___'}
-
-Loại dịch vụ: {hd_loai}
-Phạm vi: {hd_scope}
+Loại dịch vụ: {hd_loai} | Phạm vi: {hd_scope}
 Phí chưa VAT: {fmt_currency(phi_raw)}đ | VAT 10%: {fmt_currency(phi_vat)}đ | Tổng: {fmt_currency(phi_total)}đ
 Thanh toán: {hd_tt} | Thời hạn: {hd_thoihan}
 TK: CTY LUAT TNHH MINH TU | STK: 5150056789 | MB Bank CN Phú Nhuận
@@ -851,6 +830,12 @@ with tab_crm:
                             "mota":kh.get("ghichu",""),
                         }
                         st.info("Chuyển sang tab **Tạo Hợp Đồng**")
+                    if st.button("📋 Tạo ĐNTT", key=f"dntt_{kh['id']}"):
+                        st.session_state["_prefill_dntt"] = kh
+                        st.info("Chuyển sang tab **Đề Nghị Thanh Toán**")
+                    if st.button("🧾 Tạo Phiếu Thu", key=f"pt_{kh['id']}"):
+                        st.session_state["_prefill_pt"] = kh
+                        st.info("Chuyển sang tab **Phiếu Thu**")
                     if st.button("🗑 Xóa", key=f"del_{kh['id']}", type="secondary"):
                         crm[:] = [k for k in crm if k["id"] != kh["id"]]
                         st.session_state.crm = crm; save_crm(crm); st.rerun()
@@ -874,27 +859,72 @@ with tab_dntt:
     st.caption("Đề nghị khách hàng thanh toán · Tự động lưu Google Drive")
     st.divider()
 
+    # Prefill từ CRM
+    prefill_dntt = st.session_state.pop("_prefill_dntt", None)
+
+    # Dropdown chọn từ CRM
+    crm_opts_dntt = {k["id"]: f"{k['ten']} — {k['sdt'] or k['email'] or ''}"
+                     for k in st.session_state.crm}
+    crm_choice_dntt = st.selectbox(
+        "Chọn khách hàng từ CRM (tự điền form)",
+        options=["— Chọn từ danh sách —"] + list(crm_opts_dntt.values()),
+        key="dntt_crm_sel",
+    )
+    selected_dntt = None
+    if crm_choice_dntt != "— Chọn từ danh sách —":
+        selected_dntt = next((k for k in st.session_state.crm
+            if f"{k['ten']} — {k['sdt'] or k['email'] or ''}" == crm_choice_dntt), None)
+    # Ưu tiên prefill từ nút CRM, sau đó dropdown
+    kh_dntt = prefill_dntt or selected_dntt
+
+    def _dval(field, default=""):
+        return (kh_dntt.get(field, default) or default) if kh_dntt else default
+
+    # Lấy số HĐ từ hop_dong nếu có
+    so_hd_default = ""
+    if kh_dntt and kh_dntt.get("hop_dong"):
+        so_hd_default = kh_dntt["hop_dong"].get("so_hd", "")
+
+    st.divider()
+
     with st.form("form_dntt", clear_on_submit=False):
         c1, c2 = st.columns(2)
         with c1:
-            dntt_ten      = st.text_input("Tên khách hàng / Tổ chức *", placeholder="Ông/Bà Nguyễn Văn A / Công ty ABC")
-            dntt_sdt      = st.text_input("Số điện thoại", placeholder="0900 000 000")
-            dntt_dc       = st.text_input("Địa chỉ", placeholder="123 Đường XYZ, TP.HCM")
-            dntt_so_hd    = st.text_input("Số Hợp Đồng", placeholder="HD-202506-001")
+            dntt_ten      = st.text_input("Tên khách hàng / Tổ chức *",
+                                          value=_dval("ten"),
+                                          placeholder="Ông/Bà Nguyễn Văn A / Công ty ABC")
+            dntt_sdt      = st.text_input("Số điện thoại",
+                                          value=_dval("sdt"),
+                                          placeholder="0900 000 000")
+            dntt_dc       = st.text_input("Địa chỉ",
+                                          value=_dval("diachi"),
+                                          placeholder="123 Đường XYZ, TP.HCM")
+            dntt_so_hd    = st.text_input("Số Hợp Đồng",
+                                          value=so_hd_default,
+                                          placeholder="HD-202506-001")
         with c2:
-            dntt_han      = st.text_input("Hạn thanh toán", value="03 ngày làm việc kể từ ngày nhận đề nghị")
+            dntt_han      = st.text_input("Hạn thanh toán",
+                                          value="03 ngày làm việc kể từ ngày nhận đề nghị")
             dntt_ghi_chu  = st.text_area("Ghi chú", height=68)
-            dntt_ten_file = st.text_input("Tên file", placeholder="de_nghi_tt_nguyen_van_a")
+            dntt_ten_file = st.text_input("Tên file",
+                                          value=f"DNTT_{_dval('ten').replace(' ','_')[:25]}" if kh_dntt else "",
+                                          placeholder="de_nghi_tt_nguyen_van_a")
 
         st.markdown("**Danh sách khoản thanh toán**")
         n_items = st.number_input("Số dòng", min_value=1, max_value=10, value=1, step=1)
         items_data = []
+        # Gợi ý số tiền từ CRM nếu có
+        phi_goi_y = int(_dval("phi") or 0)
         for i in range(int(n_items)):
             with st.expander(f"Khoản {i+1}", expanded=(i == 0)):
                 ci1, ci2, ci3 = st.columns([4, 2, 2])
-                nd_i  = ci1.text_input("Nội dung", key=f"dntt_nd_{i}", placeholder="Phí tư vấn đợt 1...")
-                dt_i  = ci2.text_input("Đợt TT",   key=f"dntt_dt_{i}", value=f"Đợt {i+1}")
-                phi_i = ci3.number_input("Số tiền (VNĐ)", key=f"dntt_phi_{i}", min_value=0, step=500000, value=0, format="%d")
+                nd_i  = ci1.text_input("Nội dung", key=f"dntt_nd_{i}",
+                                       value=f"Phí dịch vụ pháp lý theo HĐ {so_hd_default}" if (i==0 and so_hd_default) else "",
+                                       placeholder="Phí tư vấn đợt 1...")
+                dt_i  = ci2.text_input("Đợt TT", key=f"dntt_dt_{i}", value=f"Đợt {i+1}")
+                phi_i = ci3.number_input("Số tiền (VNĐ)", key=f"dntt_phi_{i}",
+                                         min_value=0, step=500000,
+                                         value=phi_goi_y if i == 0 else 0, format="%d")
                 items_data.append({"stt": i+1, "noi_dung": nd_i, "dot_tt": dt_i, "so_tien_raw": int(phi_i)})
 
         sub_dntt = st.form_submit_button("💳 Tạo Đề Nghị Thanh Toán", type="primary", use_container_width=True)
@@ -946,21 +976,62 @@ with tab_pt:
     st.caption("Xác nhận đã thu tiền · Chuẩn Mẫu 01-TT · 2 liên · Tự động lưu Google Drive")
     st.divider()
 
+    # Prefill từ CRM
+    prefill_pt = st.session_state.pop("_prefill_pt", None)
+
+    # Dropdown chọn từ CRM
+    crm_opts_pt = {k["id"]: f"{k['ten']} — {k['sdt'] or k['email'] or ''}"
+                   for k in st.session_state.crm}
+    crm_choice_pt = st.selectbox(
+        "Chọn khách hàng từ CRM (tự điền form)",
+        options=["— Chọn từ danh sách —"] + list(crm_opts_pt.values()),
+        key="pt_crm_sel",
+    )
+    selected_pt = None
+    if crm_choice_pt != "— Chọn từ danh sách —":
+        selected_pt = next((k for k in st.session_state.crm
+            if f"{k['ten']} — {k['sdt'] or k['email'] or ''}" == crm_choice_pt), None)
+    kh_pt = prefill_pt or selected_pt
+
+    def _pval(field, default=""):
+        return (kh_pt.get(field, default) or default) if kh_pt else default
+
+    so_hd_pt_default = ""
+    if kh_pt and kh_pt.get("hop_dong"):
+        so_hd_pt_default = kh_pt["hop_dong"].get("so_hd", "")
+
+    st.divider()
+
     with st.form("form_pt", clear_on_submit=False):
         c1, c2 = st.columns(2)
         with c1:
-            pt_nguoi_nop = st.text_input("Người nộp tiền *", placeholder="Ông/Bà Nguyễn Văn A / Công ty ABC")
-            pt_sdt       = st.text_input("Số điện thoại", placeholder="0900 000 000")
-            pt_dc        = st.text_input("Địa chỉ", placeholder="123 Đường XYZ, TP.HCM")
-            pt_so_tien   = st.number_input("Số tiền đã thu (VNĐ) *", min_value=0, step=500000, value=0, format="%d")
+            pt_nguoi_nop = st.text_input("Người nộp tiền *",
+                                         value=_pval("ten"),
+                                         placeholder="Ông/Bà Nguyễn Văn A / Công ty ABC")
+            pt_sdt       = st.text_input("Số điện thoại",
+                                         value=_pval("sdt"),
+                                         placeholder="0900 000 000")
+            pt_dc        = st.text_input("Địa chỉ",
+                                         value=_pval("diachi"),
+                                         placeholder="123 Đường XYZ, TP.HCM")
+            pt_so_tien   = st.number_input("Số tiền đã thu (VNĐ) *",
+                                           min_value=0, step=500000,
+                                           value=int(_pval("phi") or 0), format="%d")
         with c2:
-            pt_noi_dung  = st.text_input("Nội dung thu", placeholder="Phí dịch vụ pháp lý đợt 1...")
-            pt_so_hd     = st.text_input("Số HĐ / Mã ĐNTT", placeholder="HD-202506-001")
-            pt_hinh_thuc = st.radio("Hình thức thanh toán", ["Chuyển khoản", "Tiền mặt"], horizontal=True)
+            pt_noi_dung  = st.text_input("Nội dung thu",
+                                         value=f"Phí dịch vụ pháp lý theo HĐ {so_hd_pt_default}" if so_hd_pt_default else "",
+                                         placeholder="Phí dịch vụ pháp lý đợt 1...")
+            pt_so_hd     = st.text_input("Số HĐ / Mã ĐNTT",
+                                         value=so_hd_pt_default,
+                                         placeholder="HD-202506-001")
+            pt_hinh_thuc = st.radio("Hình thức thanh toán",
+                                    ["Chuyển khoản", "Tiền mặt"], horizontal=True)
             pt_ngay_thu  = st.date_input("Ngày thu", value=datetime.today())
             pt_nguoi_thu = st.text_input("Người thu tiền", value="Võ Hồng Tú")
         pt_ghi_chu  = st.text_area("Ghi chú", height=60)
-        pt_ten_file = st.text_input("Tên file", placeholder="phieu_thu_nguyen_van_a")
+        pt_ten_file = st.text_input("Tên file",
+                                    value=f"PT_{_pval('ten').replace(' ','_')[:25]}" if kh_pt else "",
+                                    placeholder="phieu_thu_nguyen_van_a")
         sub_pt = st.form_submit_button("🧾 Tạo Phiếu Thu", type="primary", use_container_width=True)
 
     if sub_pt:
