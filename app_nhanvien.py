@@ -286,6 +286,7 @@ def check_timeout():
     return elapsed > TIMEOUT_MINUTES * 60
 
 def update_activity():
+    """Chỉ gọi khi user thực sự thao tác (submit form, bấm nút)."""
     st.session_state.last_active = datetime.now()
 
 def get_remaining_seconds() -> int:
@@ -502,6 +503,7 @@ if not st.session_state.authenticated:
                 st.session_state.authenticated = True
                 st.session_state.username = uname
                 st.session_state.last_active = datetime.now()
+                update_activity()
                 write_log(uname, "LOGIN", "Đăng nhập thành công")
                 st.rerun()
             else:
@@ -518,8 +520,7 @@ if not st.session_state.authenticated:
 # ─────────────────────────────────────────────
 # ĐÃ ĐĂNG NHẬP
 # ─────────────────────────────────────────────
-update_activity()
-# Tự động refresh mỗi 30 giây để đồng hồ đếm ngược và kiểm tra timeout
+# Autorefresh mỗi 30 giây để kiểm tra timeout (KHÔNG reset timer)
 st_autorefresh(interval=30000, key="auto_refresh")
 current_user = st.session_state.username
 remaining    = get_remaining_seconds()
@@ -545,14 +546,32 @@ if "hd_result" not in st.session_state:
 
 # Sidebar
 st.sidebar.markdown(f"### ⚖️ Minh Tú Law")
-st.sidebar.caption(f"👤 {current_user}")
-st.sidebar.caption(f"⏱ Còn {remaining_m:02d}:{remaining_s:02d}")
 st.sidebar.divider()
-if st.sidebar.button("🚪 Đăng xuất", use_container_width=True):
+st.sidebar.markdown(f"👤 **{current_user}**")
+
+# Hiển thị đồng hồ đếm ngược với màu cảnh báo
+if remaining_m == 0 and remaining_s <= 30:
+    st.sidebar.error(f"⏱ Sắp hết hạn: {remaining_m:02d}:{remaining_s:02d}")
+elif remaining_m < 2:
+    st.sidebar.warning(f"⏱ Còn: {remaining_m:02d}:{remaining_s:02d}")
+else:
+    st.sidebar.info(f"⏱ Còn: {remaining_m:02d}:{remaining_s:02d}")
+
+st.sidebar.divider()
+
+# Nút gia hạn phiên
+if st.sidebar.button("🔄 Gia hạn thêm 5 phút", use_container_width=True):
+    update_activity()
+    st.rerun()
+
+# Nút đăng xuất
+if st.sidebar.button("🚪 Đăng xuất", use_container_width=True, type="primary"):
     write_log(current_user, "LOGOUT", "Đăng xuất thủ công")
     st.session_state.authenticated = False
     st.session_state.username = ""
     st.rerun()
+
+st.sidebar.divider()
 st.sidebar.caption("Hotline: 1900 0031")
 st.sidebar.caption("votu@luatminhtu.vn")
 
@@ -667,6 +686,8 @@ Văn phong pháp lý trang trọng. Không dùng markdown, #, *, **.
                                 "diachi": bg_diachi, "loai": bg_loai, "phi": str(phi_raw),
                                 "duan": bg_duan, "mota": bg_mota},
                     }
+                    update_activity()
+
                     write_log(current_user, "TAO_BAO_GIA", f"KH: {bg_ten} | Mã: {ma_bg} | Phí: {fmt_currency(phi_total)}đ")
                 except Exception as e:
                     st.error(f"Lỗi AI: {e}")
@@ -708,6 +729,8 @@ Văn phong pháp lý trang trọng. Không dùng markdown, #, *, **.
                 else:
                     crm.insert(0, kh); st.success("Đã lưu khách hàng vào CRM!")
                 st.session_state.crm = crm; save_crm(crm)
+                update_activity()
+
                 write_log(current_user, "LUU_CRM", f"KH: {raw['ten']}")
         with cd:
             if st.button("→ Tạo Hợp Đồng", key="btn_bg_to_hd", use_container_width=True, type="primary"):
@@ -803,6 +826,8 @@ Soạn đủ 10 điều khoản. Không dùng markdown, #, *, **.
                         "raw": {"ten": hd_ten, "sdt": hd_sdt, "email": hd_email,
                                 "diachi": hd_diachi, "loai": hd_loai, "phi": str(phi_raw)},
                     }
+                    update_activity()
+
                     write_log(current_user, "TAO_HOP_DONG", f"KH: {hd_ten} | Số HĐ: {hd_so}")
                 except Exception as e:
                     st.error(f"Lỗi AI: {e}")
