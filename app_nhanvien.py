@@ -555,6 +555,13 @@ st.sidebar.caption("votu@luatminhtu.vn")
 
 
 # ─────────────────────────────────────────────
+# PHÂN QUYỀN
+# ─────────────────────────────────────────────
+# Tài khoản được xem tab CRM
+CRM_ALLOWED = {"admin", "hong", "hoa", "thuong"}
+can_see_crm = current_user in CRM_ALLOWED
+
+# ─────────────────────────────────────────────
 # TABS
 # ─────────────────────────────────────────────
 if current_user == "admin":
@@ -562,11 +569,18 @@ if current_user == "admin":
         "📋 Tạo Báo Giá", "📝 Tạo Hợp Đồng", "👥 CRM Khách Hàng",
         "💳 Đề Nghị Thanh Toán", "🧾 Phiếu Thu", "🔐 Log Hoạt Động",
     ])
-else:
+elif can_see_crm:
     tab_bg, tab_hd, tab_crm, tab_dntt, tab_pt = st.tabs([
         "📋 Tạo Báo Giá", "📝 Tạo Hợp Đồng", "👥 CRM Khách Hàng",
         "💳 Đề Nghị Thanh Toán", "🧾 Phiếu Thu",
     ])
+    tab_log = None
+else:
+    tab_bg, tab_hd, tab_dntt, tab_pt = st.tabs([
+        "📋 Tạo Báo Giá", "📝 Tạo Hợp Đồng",
+        "💳 Đề Nghị Thanh Toán", "🧾 Phiếu Thu",
+    ])
+    tab_crm = None
     tab_log = None
 
 
@@ -834,7 +848,8 @@ Soạn đủ 10 điều khoản. Không dùng markdown, #, *, **.
 # ══════════════════════════════════════════════
 # TAB 3 — CRM
 # ══════════════════════════════════════════════
-with tab_crm:
+if can_see_crm and tab_crm is not None:
+ with tab_crm:
     st.markdown("### CRM Khách Hàng")
     st.caption("Lưu trữ & quản lý hồ sơ · Đồng bộ Google Drive")
     st.divider()
