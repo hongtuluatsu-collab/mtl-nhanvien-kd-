@@ -286,11 +286,13 @@ Văn phong pháp lý, trang trọng, căn đều. Không dùng markdown, *, #, *
             encoding="utf-8",
         )
 
-        js_file = (
-            "agents/word_hop_dong.js" if loai == "hop_dong"
-            else "agents/word_bao_gia.js"
-        )
-
+        JS_MAP = {
+            "hop_dong":   "agents/word_hop_dong.js",
+            "bao_gia":    "agents/word_bao_gia.js",
+            "de_nghi_tt": "agents/word_de_nghi_tt.js",
+            "phieu_thu":  "agents/word_phieu_thu.js",
+        }
+        js_file = JS_MAP.get(loai, "agents/word_bao_gia.js")
         try:
             result = subprocess.run(
                 ["node", js_file, json_path, docx_path],
