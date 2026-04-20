@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
-from streamlit_autorefresh import st_autorefresh
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from google.oauth2 import service_account
@@ -520,8 +519,9 @@ if not st.session_state.authenticated:
 # ─────────────────────────────────────────────
 # ĐÃ ĐĂNG NHẬP
 # ─────────────────────────────────────────────
-# Autorefresh mỗi 30 giây để kiểm tra timeout (KHÔNG reset timer)
-st_autorefresh(interval=30000, key="auto_refresh")
+# Autorefresh mỗi 30 giây bằng JS — không cần package ngoài
+import streamlit.components.v1 as components
+components.html("<script>setTimeout(()=>window.location.reload(),30000);</script>", height=0)
 current_user = st.session_state.username
 remaining    = get_remaining_seconds()
 remaining_m  = remaining // 60
