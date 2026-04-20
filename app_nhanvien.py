@@ -1,12 +1,12 @@
 """
 app_nhanvien.py — Minh Tú Law | Nhân Viên Kinh Doanh
 5 chức năng: Tạo Báo Giá · Tạo Hợp Đồng · CRM · Đề Nghị Thanh Toán · Phiếu Thu
-Mật khẩu: env NV_PASSWORD (mặc định: MinhTu@2026)
+Bảo mật: Tài khoản riêng · Tự động đăng xuất 5 phút · Log hoạt động
 Google Drive: tự động sync CRM + tất cả file docx
 """
 import streamlit as st
 import os, json, re, csv, io, subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
@@ -26,14 +26,31 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-NV_PASSWORD     = os.getenv("NV_PASSWORD", "MinhTu@2026")
 API_KEY         = os.getenv("ANTHROPIC_API_KEY", "")
 HOPDONG_DIR     = Path("data/hop_dong")
 MAU_DIR         = Path("data/mau")
 DRIVE_FOLDER_ID = "1jdKtlmQScB8hbpLYfGgvArbzfy8kxO4A"
 CRM_FILENAME    = "crm.json"
+LOG_FILENAME    = "activity_log.json"
 NAVY            = "#1B4A7A"
 GOLD            = "#B8973A"
+TIMEOUT_MINUTES = 5  # Tự động đăng xuất sau 5 phút không hoạt động
+
+# Danh sách tài khoản nhân viên — mỗi người 1 tài khoản riêng
+# Anh có thể thêm/xóa nhân viên tại đây hoặc dùng env variable NV_ACCOUNTS
+_default_accounts = {
+    "admin":    os.getenv("NV_PASSWORD", "MinhTu@2026"),
+    "nhanvien1": os.getenv("NV_PASS_1", "MTL_NV1@2026"),
+    "nhanvien2": os.getenv("NV_PASS_2", "MTL_NV2@2026"),
+    "nhanvien3": os.getenv("NV_PASS_3", "MTL_NV3@2026"),
+}
+try:
+    NV_ACCOUNTS = json.loads(os.getenv("NV_ACCOUNTS", "{}")) or _default_accounts
+except Exception:
+    NV_ACCOUNTS = _default_accounts
+
+NAVY = "#1B4A7A"
+GOLD = "#B8973A"
 
 # ─────────────────────────────────────────────
 # CSS THƯƠNG HIỆU MTL
@@ -91,6 +108,10 @@ st.markdown(f"""
   .login-wrap {{ max-width: 400px; margin: 80px auto; text-align: center; }}
   .login-title {{ font-family: 'Playfair Display', serif; font-size: 28px; color: {NAVY}; margin-bottom: 6px; }}
   .login-sub {{ color: #6b5e4e; font-size: 13px; margin-bottom: 32px; }}
+  .timeout-bar {{
+    background: #fff3cd; border: 1px solid {GOLD}; border-radius: 6px;
+    padding: 8px 14px; font-size: 13px; color: #856404; margin-bottom: 12px;
+  }}
   #MainMenu, footer, header {{ visibility: hidden; }}
   .block-container {{ padding: 1rem 2rem; max-width: 1200px; }}
 </style>
@@ -140,6 +161,74 @@ def _upload_to_drive(content_bytes: bytes, filename: str, mimetype: str):
             ).execute()
     except Exception:
         pass
+
+
+# ─────────────────────────────────────────────
+# LOG HOẠT ĐỘNG
+# ─────────────────────────────────────────────
+def _load_log() -> list:
+    try:
+        f = Path("data/activity_log.json")
+        f.parent.mkdir(parents=True, exist_ok=True)
+        if f.exists():
+            return json.loads(f.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return []
+
+def _save_log(logs: list):
+    try:
+        f = Path("data/activity_log.json")
+        f.parent.mkdir(parents=True, exist_ok=True)
+        # Giữ tối đa 500 dòng log gần nhất
+        logs = logs[-500:]
+        f.write_text(json.dumps(logs, ensure_ascii=False, indent=2), encoding="utf-8")
+        # Upload lên Drive
+        _upload_to_drive(
+            json.dumps(logs, ensure_ascii=False, indent=2).encode("utf-8"),
+            LOG_FILENAME, "application/json"
+        )
+    except Exception:
+        pass
+
+def write_log(username: str, action: str, detail: str = ""):
+    """Ghi log một hành động."""
+    logs = _load_log()
+    entry = {
+        "time":     datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "user":     username,
+        "action":   action,
+        "detail":   detail,
+        "ip":       st.context.headers.get("X-Forwarded-For", "unknown") if hasattr(st, "context") else "unknown",
+    }
+    logs.append(entry)
+    _save_log(logs)
+
+
+# ─────────────────────────────────────────────
+# AUTO LOGOUT — kiểm tra timeout
+# ─────────────────────────────────────────────
+def check_timeout():
+    """Trả về True nếu đã timeout, đồng thời cập nhật last_active."""
+    if "last_active" not in st.session_state:
+        st.session_state.last_active = datetime.now()
+        return False
+    elapsed = (datetime.now() - st.session_state.last_active).total_seconds()
+    if elapsed > TIMEOUT_MINUTES * 60:
+        return True
+    return False
+
+def update_activity():
+    """Cập nhật thời gian hoạt động gần nhất."""
+    st.session_state.last_active = datetime.now()
+
+def get_remaining_seconds() -> int:
+    """Số giây còn lại trước khi timeout."""
+    if "last_active" not in st.session_state:
+        return TIMEOUT_MINUTES * 60
+    elapsed = (datetime.now() - st.session_state.last_active).total_seconds()
+    remaining = TIMEOUT_MINUTES * 60 - elapsed
+    return max(0, int(remaining))
 
 
 # ─────────────────────────────────────────────
@@ -317,11 +406,31 @@ def tao_phieu_thu(
 
 
 # ─────────────────────────────────────────────
-# LOGIN
+# SESSION STATE KHỞI TẠO
 # ─────────────────────────────────────────────
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+if "last_active" not in st.session_state:
+    st.session_state.last_active = datetime.now()
 
+
+# ─────────────────────────────────────────────
+# KIỂM TRA TIMEOUT TRƯỚC KHI RENDER
+# ─────────────────────────────────────────────
+if st.session_state.authenticated:
+    if check_timeout():
+        write_log(st.session_state.username, "AUTO_LOGOUT", "Tự động đăng xuất sau 5 phút không hoạt động")
+        st.session_state.authenticated = False
+        st.session_state.username = ""
+        st.warning("⏱ Phiên làm việc đã hết hạn sau 5 phút không hoạt động. Vui lòng đăng nhập lại.")
+        st.rerun()
+
+
+# ─────────────────────────────────────────────
+# LOGIN
+# ─────────────────────────────────────────────
 if not st.session_state.authenticated:
     st.markdown("""
     <div class="login-wrap">
@@ -342,14 +451,30 @@ if not st.session_state.authenticated:
     """, unsafe_allow_html=True)
     col_l, col_c, col_r = st.columns([1, 1, 1])
     with col_c:
-        pw = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
+        username_input = st.text_input("Tên đăng nhập", placeholder="Nhập tên đăng nhập...")
+        pw_input       = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
         if st.button("Đăng nhập", use_container_width=True, type="primary"):
-            if pw == NV_PASSWORD:
+            uname = username_input.strip().lower()
+            if uname in NV_ACCOUNTS and NV_ACCOUNTS[uname] == pw_input:
                 st.session_state.authenticated = True
+                st.session_state.username = uname
+                st.session_state.last_active = datetime.now()
+                write_log(uname, "LOGIN", "Đăng nhập thành công")
                 st.rerun()
             else:
-                st.error("Mật khẩu không đúng.")
+                write_log(username_input.strip(), "LOGIN_FAIL", "Đăng nhập thất bại")
+                st.error("Tên đăng nhập hoặc mật khẩu không đúng.")
     st.stop()
+
+
+# ─────────────────────────────────────────────
+# ĐÃ ĐĂNG NHẬP — cập nhật hoạt động
+# ─────────────────────────────────────────────
+update_activity()
+current_user = st.session_state.username
+remaining    = get_remaining_seconds()
+remaining_m  = remaining // 60
+remaining_s  = remaining % 60
 
 
 # ─────────────────────────────────────────────
@@ -361,13 +486,13 @@ st.markdown(f"""
     <span class="logo-m">M</span><span class="logo-t">T</span><span class="logo-l">L</span>
   </div>
   <div class="mtl-title">Minh Tú Law — Nhân Viên Kinh Doanh</div>
-  <div class="mtl-sub">⚖️ {today_str()}</div>
+  <div class="mtl-sub">⚖️ {today_str()} &nbsp;|&nbsp; 👤 {current_user} &nbsp;|&nbsp; ⏱ {remaining_m:02d}:{remaining_s:02d}</div>
 </div>
 """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────
-# SESSION STATE
+# SESSION STATE DATA
 # ─────────────────────────────────────────────
 if "crm" not in st.session_state:
     st.session_state.crm = load_crm()
@@ -378,15 +503,19 @@ if "hd_result" not in st.session_state:
 
 
 # ─────────────────────────────────────────────
-# 5 TABS
+# 5 TABS + TAB LOG (chỉ admin thấy)
 # ─────────────────────────────────────────────
-tab_bg, tab_hd, tab_crm, tab_dntt, tab_pt = st.tabs([
-    "📋 Tạo Báo Giá",
-    "📝 Tạo Hợp Đồng",
-    "👥 CRM Khách Hàng",
-    "💳 Đề Nghị Thanh Toán",
-    "🧾 Phiếu Thu",
-])
+if current_user == "admin":
+    tab_bg, tab_hd, tab_crm, tab_dntt, tab_pt, tab_log = st.tabs([
+        "📋 Tạo Báo Giá", "📝 Tạo Hợp Đồng", "👥 CRM Khách Hàng",
+        "💳 Đề Nghị Thanh Toán", "🧾 Phiếu Thu", "🔐 Log Hoạt Động",
+    ])
+else:
+    tab_bg, tab_hd, tab_crm, tab_dntt, tab_pt = st.tabs([
+        "📋 Tạo Báo Giá", "📝 Tạo Hợp Đồng", "👥 CRM Khách Hàng",
+        "💳 Đề Nghị Thanh Toán", "🧾 Phiếu Thu",
+    ])
+    tab_log = None
 
 
 # ══════════════════════════════════════════════
@@ -433,13 +562,11 @@ with tab_bg:
             phi_vat   = round(phi_raw * 0.1)
             phi_total = phi_raw + phi_vat
             prompt = f"""Soạn THƯ BÁO PHÍ DỊCH VỤ PHÁP LÝ theo cấu trúc sau:
-
 Mã báo giá: {ma_bg} | Ngày: {today_str()}
-Khách hàng: {bg_ten}
-SĐT: {bg_sdt or '—'} | Email: {bg_email or '—'}
-Địa chỉ: {bg_diachi or '—'}
-Loại vụ: {bg_loai} | Tên vụ/dự án: {bg_duan or bg_loai}
-Cách tính phí: {bg_cach} | Mô tả: {bg_mota}
+Khách hàng: {bg_ten} | SĐT: {bg_sdt or '—'} | Email: {bg_email or '—'}
+Địa chỉ: {bg_diachi or '—'} | Loại vụ: {bg_loai}
+Tên vụ/dự án: {bg_duan or bg_loai} | Cách tính phí: {bg_cach}
+Mô tả: {bg_mota}
 
 CẤU TRÚC BẮT BUỘC:
 I. PHẠM VI DỊCH VỤ
@@ -453,14 +580,12 @@ Thuế VAT (10%): {fmt_currency(phi_vat)}đ
 Tổng phí phải thanh toán: {fmt_currency(phi_total)}đ
 (bằng chữ: [viết bằng chữ tổng phí])
 
-III. ĐIỀU KIỆN & LƯU Ý
-(4 điểm quan trọng)
+III. ĐIỀU KIỆN & LƯU Ý (4 điểm)
 
 IV. THANH TOÁN
 Tên TK: CTY LUAT TNHH MINH TU
 STK: 5150056789 — MB Bank (TMCP Quân Đội), CN Phú Nhuận
 Nội dung CK: [Tên KH] thanh toán {ma_bg}
-
 Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
 """
             with st.spinner("AI đang soạn thư báo phí..."):
@@ -480,6 +605,7 @@ Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
                                 "diachi": bg_diachi, "loai": bg_loai, "phi": str(phi_raw),
                                 "duan": bg_duan, "mota": bg_mota},
                     }
+                    write_log(current_user, "TAO_BAO_GIA", f"KH: {bg_ten} | Mã: {ma_bg} | Phí: {fmt_currency(phi_total)}đ")
                 except Exception as e:
                     st.error(f"Lỗi AI: {e}")
 
@@ -498,6 +624,7 @@ Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
                 if docx_path.startswith("LOI:"):
                     st.error(f"Lỗi: {docx_path}")
                 elif Path(docx_path).exists():
+                    write_log(current_user, "XUAT_WORD_BG", f"File: {ten_file}.docx")
                     with open(docx_path, "rb") as f:
                         st.download_button("📥 Tải về .docx", data=f.read(),
                             file_name=f"BaoGia_{r['ma']}.docx",
@@ -528,6 +655,7 @@ Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
                     st.success("Đã lưu khách hàng vào CRM!")
                 st.session_state.crm = crm
                 save_crm(crm)
+                write_log(current_user, "LUU_CRM", f"KH: {raw['ten']}")
         with cd:
             if st.button("→ Tạo Hợp Đồng", key="btn_bg_to_hd", use_container_width=True, type="primary"):
                 st.session_state["_prefill_hd"] = r["raw"]
@@ -560,7 +688,7 @@ with tab_hd:
     with st.form("form_hopdong", clear_on_submit=False):
         c1, c2 = st.columns(2)
         with c1:
-            hd_so     = st.text_input("Số hợp đồng", value=gen_ma_hd(), placeholder="HD-2026-001")
+            hd_so     = st.text_input("Số hợp đồng", value=gen_ma_hd())
             hd_ten    = st.text_input("Tên khách hàng / Doanh nghiệp *", value=_val("ten"))
             hd_cmnd   = st.text_input("CMND/CCCD hoặc MST")
             hd_diachi = st.text_input("Địa chỉ", value=_val("diachi"))
@@ -586,8 +714,7 @@ with tab_hd:
                 "Đến khi hoàn thành vụ việc", "3 tháng", "6 tháng", "12 tháng", "24 tháng",
             ])
         hd_scope = st.text_area("Phạm vi dịch vụ / Công việc cụ thể *",
-            value=_val("mota") or _val("ghichu"),
-            placeholder="Mô tả chi tiết các công việc pháp lý sẽ thực hiện...", height=120)
+            value=_val("mota") or _val("ghichu"), height=120)
         submitted_hd = st.form_submit_button("✦ AI Soạn Hợp Đồng", type="primary", use_container_width=True)
 
     if submitted_hd:
@@ -603,7 +730,6 @@ with tab_hd:
             phi_vat   = round(phi_raw * 0.1)
             phi_total = phi_raw + phi_vat
             prompt = f"""Soạn HỢP ĐỒNG DỊCH VỤ PHÁP LÝ đầy đủ theo chuẩn pháp lý Việt Nam:
-
 Số HĐ: {hd_so} | Ngày ký: {today_str()}
 BÊN A: CÔNG TY LUẬT TNHH MINH TÚ
   GPĐKHĐ: 41.02.4764/TP/ĐKHĐ | MST: 0318941023
@@ -611,16 +737,13 @@ BÊN A: CÔNG TY LUẬT TNHH MINH TÚ
   Trụ sở: 4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, TP.HCM
   Chi nhánh Đà Nẵng: 81 Xô Viết Nghệ Tĩnh, P. Cẩm Lệ, TP. Đà Nẵng
   Hotline: 1900 0031 | Email: votu@luatminhtu.vn
-BÊN B: {hd_ten}
-  CMND/MST: {hd_cmnd or '___'} | Địa chỉ: {hd_diachi or '___'}
+BÊN B: {hd_ten} | CMND/MST: {hd_cmnd or '___'} | Địa chỉ: {hd_diachi or '___'}
   SĐT: {hd_sdt or '___'} | Email: {hd_email or '___'}
 Loại dịch vụ: {hd_loai} | Phạm vi: {hd_scope}
 Phí chưa VAT: {fmt_currency(phi_raw)}đ | VAT 10%: {fmt_currency(phi_vat)}đ | Tổng: {fmt_currency(phi_total)}đ
 Thanh toán: {hd_tt} | Thời hạn: {hd_thoihan}
 TK: CTY LUAT TNHH MINH TU | STK: 5150056789 | MB Bank CN Phú Nhuận
-
-Soạn đủ 10 điều khoản: Đối tượng HĐ · Phí & TT · Quyền nghĩa vụ A · Quyền nghĩa vụ B · Thời hạn · Chấm dứt · Hiệu lực · Tranh chấp (TAND TP.HCM) · Bảo mật · Cam kết chung.
-Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
+Soạn đủ 10 điều khoản. Văn phong pháp lý. Không dùng markdown, #, *, **.
 """
             with st.spinner("AI đang soạn hợp đồng..."):
                 try:
@@ -638,6 +761,7 @@ Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
                         "raw": {"ten": hd_ten, "sdt": hd_sdt, "email": hd_email,
                                 "diachi": hd_diachi, "loai": hd_loai, "phi": str(phi_raw)},
                     }
+                    write_log(current_user, "TAO_HOP_DONG", f"KH: {hd_ten} | Số HĐ: {hd_so} | Phí: {fmt_currency(phi_total)}đ")
                 except Exception as e:
                     st.error(f"Lỗi AI: {e}")
 
@@ -646,7 +770,6 @@ Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
         st.markdown('<hr class="gold-div">', unsafe_allow_html=True)
         st.markdown(f"**📜 Hợp Đồng** — `{r['so_hd']}`")
         st.markdown(f'<div class="result-box">{r["noi_dung"]}</div>', unsafe_allow_html=True)
-        st.markdown("#### Xuất & Lưu")
         ca, cb, cc = st.columns(3)
         with ca:
             if st.button("⬇ Xuất Word (.docx)", key="btn_export_hd", use_container_width=True):
@@ -656,6 +779,7 @@ Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
                 if docx_path.startswith("LOI:"):
                     st.error(f"Lỗi: {docx_path}")
                 elif Path(docx_path).exists():
+                    write_log(current_user, "XUAT_WORD_HD", f"File: {ten_file}.docx")
                     with open(docx_path, "rb") as f:
                         st.download_button("📥 Tải về .docx", data=f.read(),
                             file_name=f"HopDong_{r['so_hd']}.docx",
@@ -685,6 +809,7 @@ Văn phong pháp lý, trang trọng. Không dùng markdown, #, *, **.
                     st.success("Đã thêm khách hàng vào CRM!")
                 st.session_state.crm = crm
                 save_crm(crm)
+                write_log(current_user, "LUU_CRM_HD", f"KH: {raw['ten']} | HĐ: {r['so_hd']}")
 
 
 # ══════════════════════════════════════════════
@@ -760,6 +885,7 @@ with tab_crm:
                         crm.insert(0, new_kh)
                         st.session_state.crm = crm
                         save_crm(crm)
+                        write_log(current_user, "THEM_KH_CRM", f"KH mới: {add_ten}")
                         st.session_state["show_add_form"] = False
                         st.success("Đã thêm khách hàng!")
                         st.rerun()
@@ -821,7 +947,9 @@ with tab_crm:
                     if st.button("Cập nhật", key=f"upd_{kh['id']}"):
                         idx = next(i for i,k in enumerate(crm) if k["id"]==kh["id"])
                         crm[idx]["trang_thai"] = new_ts
-                        st.session_state.crm = crm; save_crm(crm); st.rerun()
+                        st.session_state.crm = crm; save_crm(crm)
+                        write_log(current_user, "CAP_NHAT_KH", f"KH: {kh['ten']} → {new_ts}")
+                        st.rerun()
                     if st.button("Tạo HĐ từ KH này", key=f"hd_{kh['id']}", type="primary"):
                         st.session_state["_prefill_hd"] = {
                             "ten":kh.get("ten",""), "sdt":kh.get("sdt",""),
@@ -830,7 +958,7 @@ with tab_crm:
                             "mota":kh.get("ghichu",""),
                         }
                         st.info("Chuyển sang tab **Tạo Hợp Đồng**")
-                    if st.button("📋 Tạo ĐNTT", key=f"dntt_{kh['id']}"):
+                    if st.button("💳 Tạo ĐNTT", key=f"dntt_{kh['id']}"):
                         st.session_state["_prefill_dntt"] = kh
                         st.info("Chuyển sang tab **Đề Nghị Thanh Toán**")
                     if st.button("🧾 Tạo Phiếu Thu", key=f"pt_{kh['id']}"):
@@ -838,14 +966,19 @@ with tab_crm:
                         st.info("Chuyển sang tab **Phiếu Thu**")
                     if st.button("🗑 Xóa", key=f"del_{kh['id']}", type="secondary"):
                         crm[:] = [k for k in crm if k["id"] != kh["id"]]
-                        st.session_state.crm = crm; save_crm(crm); st.rerun()
+                        st.session_state.crm = crm; save_crm(crm)
+                        write_log(current_user, "XOA_KH", f"KH: {kh['ten']}")
+                        st.rerun()
             st.divider()
 
     st.sidebar.markdown("### ⚖️ Minh Tú Law")
-    st.sidebar.caption("Nhân viên kinh doanh")
+    st.sidebar.caption(f"👤 {current_user}")
+    st.sidebar.caption(f"⏱ Còn {remaining_m:02d}:{remaining_s:02d}")
     st.sidebar.divider()
     if st.sidebar.button("🚪 Đăng xuất", use_container_width=True):
+        write_log(current_user, "LOGOUT", "Đăng xuất thủ công")
         st.session_state.authenticated = False
+        st.session_state.username = ""
         st.rerun()
     st.sidebar.caption("Hotline: 1900 0031")
     st.sidebar.caption("votu@luatminhtu.vn")
@@ -859,28 +992,20 @@ with tab_dntt:
     st.caption("Đề nghị khách hàng thanh toán · Tự động lưu Google Drive")
     st.divider()
 
-    # Prefill từ CRM
     prefill_dntt = st.session_state.pop("_prefill_dntt", None)
-
-    # Dropdown chọn từ CRM
     crm_opts_dntt = {k["id"]: f"{k['ten']} — {k['sdt'] or k['email'] or ''}"
                      for k in st.session_state.crm}
-    crm_choice_dntt = st.selectbox(
-        "Chọn khách hàng từ CRM (tự điền form)",
-        options=["— Chọn từ danh sách —"] + list(crm_opts_dntt.values()),
-        key="dntt_crm_sel",
-    )
+    crm_choice_dntt = st.selectbox("Chọn khách hàng từ CRM (tự điền form)",
+        options=["— Chọn từ danh sách —"] + list(crm_opts_dntt.values()), key="dntt_crm_sel")
     selected_dntt = None
     if crm_choice_dntt != "— Chọn từ danh sách —":
         selected_dntt = next((k for k in st.session_state.crm
             if f"{k['ten']} — {k['sdt'] or k['email'] or ''}" == crm_choice_dntt), None)
-    # Ưu tiên prefill từ nút CRM, sau đó dropdown
     kh_dntt = prefill_dntt or selected_dntt
 
     def _dval(field, default=""):
         return (kh_dntt.get(field, default) or default) if kh_dntt else default
 
-    # Lấy số HĐ từ hop_dong nếu có
     so_hd_default = ""
     if kh_dntt and kh_dntt.get("hop_dong"):
         so_hd_default = kh_dntt["hop_dong"].get("so_hd", "")
@@ -890,41 +1015,30 @@ with tab_dntt:
     with st.form("form_dntt", clear_on_submit=False):
         c1, c2 = st.columns(2)
         with c1:
-            dntt_ten      = st.text_input("Tên khách hàng / Tổ chức *",
-                                          value=_dval("ten"),
-                                          placeholder="Ông/Bà Nguyễn Văn A / Công ty ABC")
-            dntt_sdt      = st.text_input("Số điện thoại",
-                                          value=_dval("sdt"),
-                                          placeholder="0900 000 000")
-            dntt_dc       = st.text_input("Địa chỉ",
-                                          value=_dval("diachi"),
-                                          placeholder="123 Đường XYZ, TP.HCM")
-            dntt_so_hd    = st.text_input("Số Hợp Đồng",
-                                          value=so_hd_default,
-                                          placeholder="HD-202506-001")
+            dntt_ten      = st.text_input("Tên khách hàng / Tổ chức *", value=_dval("ten"), placeholder="Ông/Bà Nguyễn Văn A")
+            dntt_sdt      = st.text_input("Số điện thoại", value=_dval("sdt"))
+            dntt_dc       = st.text_input("Địa chỉ", value=_dval("diachi"))
+            dntt_so_hd    = st.text_input("Số Hợp Đồng", value=so_hd_default, placeholder="HD-202506-001")
         with c2:
-            dntt_han      = st.text_input("Hạn thanh toán",
-                                          value="03 ngày làm việc kể từ ngày nhận đề nghị")
+            dntt_han      = st.text_input("Hạn thanh toán", value="03 ngày làm việc kể từ ngày nhận đề nghị")
             dntt_ghi_chu  = st.text_area("Ghi chú", height=68)
             dntt_ten_file = st.text_input("Tên file",
-                                          value=f"DNTT_{_dval('ten').replace(' ','_')[:25]}" if kh_dntt else "",
-                                          placeholder="de_nghi_tt_nguyen_van_a")
+                value=f"DNTT_{_dval('ten').replace(' ','_')[:25]}" if kh_dntt else "",
+                placeholder="de_nghi_tt_nguyen_van_a")
 
         st.markdown("**Danh sách khoản thanh toán**")
         n_items = st.number_input("Số dòng", min_value=1, max_value=10, value=1, step=1)
         items_data = []
-        # Gợi ý số tiền từ CRM nếu có
         phi_goi_y = int(_dval("phi") or 0)
         for i in range(int(n_items)):
             with st.expander(f"Khoản {i+1}", expanded=(i == 0)):
                 ci1, ci2, ci3 = st.columns([4, 2, 2])
                 nd_i  = ci1.text_input("Nội dung", key=f"dntt_nd_{i}",
-                                       value=f"Phí dịch vụ pháp lý theo HĐ {so_hd_default}" if (i==0 and so_hd_default) else "",
-                                       placeholder="Phí tư vấn đợt 1...")
+                    value=f"Phí dịch vụ pháp lý theo HĐ {so_hd_default}" if (i==0 and so_hd_default) else "",
+                    placeholder="Phí tư vấn đợt 1...")
                 dt_i  = ci2.text_input("Đợt TT", key=f"dntt_dt_{i}", value=f"Đợt {i+1}")
                 phi_i = ci3.number_input("Số tiền (VNĐ)", key=f"dntt_phi_{i}",
-                                         min_value=0, step=500000,
-                                         value=phi_goi_y if i == 0 else 0, format="%d")
+                    min_value=0, step=500000, value=phi_goi_y if i == 0 else 0, format="%d")
                 items_data.append({"stt": i+1, "noi_dung": nd_i, "dot_tt": dt_i, "so_tien_raw": int(phi_i)})
 
         sub_dntt = st.form_submit_button("💳 Tạo Đề Nghị Thanh Toán", type="primary", use_container_width=True)
@@ -940,15 +1054,11 @@ with tab_dntt:
                 with st.spinner("Đang tạo Đề Nghị Thanh Toán..."):
                     try:
                         valid_items = [it for it in items_data if it["noi_dung"].strip()]
-                        result     = tao_de_nghi_tt(
-                            ten_than_chu   = dntt_ten.strip(),
-                            so_hop_dong    = dntt_so_hd.strip(),
-                            items          = valid_items,
-                            tong_phi_raw   = tong_phi,
-                            han_thanh_toan = dntt_han.strip(),
-                            dia_chi        = dntt_dc.strip(),
-                            sdt            = dntt_sdt.strip(),
-                            ghi_chu        = dntt_ghi_chu.strip(),
+                        result = tao_de_nghi_tt(
+                            ten_than_chu=dntt_ten.strip(), so_hop_dong=dntt_so_hd.strip(),
+                            items=valid_items, tong_phi_raw=tong_phi,
+                            han_thanh_toan=dntt_han.strip(), dia_chi=dntt_dc.strip(),
+                            sdt=dntt_sdt.strip(), ghi_chu=dntt_ghi_chu.strip(),
                         )
                         ma_dntt    = result["ma_de_nghi"]
                         data_extra = result["data_extra"]
@@ -957,6 +1067,7 @@ with tab_dntt:
                         if docx_path.startswith("LOI:"):
                             st.error(f"❌ {docx_path}")
                         else:
+                            write_log(current_user, "TAO_DNTT", f"KH: {dntt_ten.strip()} | Mã: {ma_dntt} | Tổng: {tong_phi:,}đ")
                             st.success(f"✅ Đã tạo **{ma_dntt}** · Đã lưu Google Drive")
                             st.metric("Tổng tiền đề nghị", f"{tong_phi:,}".replace(",", ".") + " đ")
                             with open(docx_path, "rb") as f:
@@ -976,17 +1087,11 @@ with tab_pt:
     st.caption("Xác nhận đã thu tiền · Chuẩn Mẫu 01-TT · 2 liên · Tự động lưu Google Drive")
     st.divider()
 
-    # Prefill từ CRM
     prefill_pt = st.session_state.pop("_prefill_pt", None)
-
-    # Dropdown chọn từ CRM
     crm_opts_pt = {k["id"]: f"{k['ten']} — {k['sdt'] or k['email'] or ''}"
                    for k in st.session_state.crm}
-    crm_choice_pt = st.selectbox(
-        "Chọn khách hàng từ CRM (tự điền form)",
-        options=["— Chọn từ danh sách —"] + list(crm_opts_pt.values()),
-        key="pt_crm_sel",
-    )
+    crm_choice_pt = st.selectbox("Chọn khách hàng từ CRM (tự điền form)",
+        options=["— Chọn từ danh sách —"] + list(crm_opts_pt.values()), key="pt_crm_sel")
     selected_pt = None
     if crm_choice_pt != "— Chọn từ danh sách —":
         selected_pt = next((k for k in st.session_state.crm
@@ -1005,33 +1110,23 @@ with tab_pt:
     with st.form("form_pt", clear_on_submit=False):
         c1, c2 = st.columns(2)
         with c1:
-            pt_nguoi_nop = st.text_input("Người nộp tiền *",
-                                         value=_pval("ten"),
-                                         placeholder="Ông/Bà Nguyễn Văn A / Công ty ABC")
-            pt_sdt       = st.text_input("Số điện thoại",
-                                         value=_pval("sdt"),
-                                         placeholder="0900 000 000")
-            pt_dc        = st.text_input("Địa chỉ",
-                                         value=_pval("diachi"),
-                                         placeholder="123 Đường XYZ, TP.HCM")
+            pt_nguoi_nop = st.text_input("Người nộp tiền *", value=_pval("ten"), placeholder="Ông/Bà Nguyễn Văn A")
+            pt_sdt       = st.text_input("Số điện thoại", value=_pval("sdt"))
+            pt_dc        = st.text_input("Địa chỉ", value=_pval("diachi"))
             pt_so_tien   = st.number_input("Số tiền đã thu (VNĐ) *",
-                                           min_value=0, step=500000,
-                                           value=int(_pval("phi") or 0), format="%d")
+                min_value=0, step=500000, value=int(_pval("phi") or 0), format="%d")
         with c2:
             pt_noi_dung  = st.text_input("Nội dung thu",
-                                         value=f"Phí dịch vụ pháp lý theo HĐ {so_hd_pt_default}" if so_hd_pt_default else "",
-                                         placeholder="Phí dịch vụ pháp lý đợt 1...")
-            pt_so_hd     = st.text_input("Số HĐ / Mã ĐNTT",
-                                         value=so_hd_pt_default,
-                                         placeholder="HD-202506-001")
-            pt_hinh_thuc = st.radio("Hình thức thanh toán",
-                                    ["Chuyển khoản", "Tiền mặt"], horizontal=True)
+                value=f"Phí dịch vụ pháp lý theo HĐ {so_hd_pt_default}" if so_hd_pt_default else "",
+                placeholder="Phí dịch vụ pháp lý đợt 1...")
+            pt_so_hd     = st.text_input("Số HĐ / Mã ĐNTT", value=so_hd_pt_default)
+            pt_hinh_thuc = st.radio("Hình thức thanh toán", ["Chuyển khoản", "Tiền mặt"], horizontal=True)
             pt_ngay_thu  = st.date_input("Ngày thu", value=datetime.today())
             pt_nguoi_thu = st.text_input("Người thu tiền", value="Võ Hồng Tú")
         pt_ghi_chu  = st.text_area("Ghi chú", height=60)
         pt_ten_file = st.text_input("Tên file",
-                                    value=f"PT_{_pval('ten').replace(' ','_')[:25]}" if kh_pt else "",
-                                    placeholder="phieu_thu_nguyen_van_a")
+            value=f"PT_{_pval('ten').replace(' ','_')[:25]}" if kh_pt else "",
+            placeholder="phieu_thu_nguyen_van_a")
         sub_pt = st.form_submit_button("🧾 Tạo Phiếu Thu", type="primary", use_container_width=True)
 
     if sub_pt:
@@ -1044,18 +1139,14 @@ with tab_pt:
                 try:
                     so_hd_clean   = pt_so_hd.strip().split("/")[0].strip()
                     ma_dntt_clean = pt_so_hd.strip().split("/")[1].strip() if "/" in pt_so_hd else ""
-                    result     = tao_phieu_thu(
-                        nguoi_nop    = pt_nguoi_nop.strip(),
-                        so_tien_raw  = int(pt_so_tien),
-                        noi_dung_thu = pt_noi_dung.strip(),
-                        hinh_thuc_tt = pt_hinh_thuc,
-                        so_hop_dong  = so_hd_clean,
-                        ma_de_nghi   = ma_dntt_clean,
-                        dia_chi      = pt_dc.strip(),
-                        sdt          = pt_sdt.strip(),
-                        nguoi_thu    = pt_nguoi_thu.strip(),
-                        ngay_thu     = pt_ngay_thu.strftime("%d/%m/%Y"),
-                        ghi_chu      = pt_ghi_chu.strip(),
+                    result = tao_phieu_thu(
+                        nguoi_nop=pt_nguoi_nop.strip(), so_tien_raw=int(pt_so_tien),
+                        noi_dung_thu=pt_noi_dung.strip(), hinh_thuc_tt=pt_hinh_thuc,
+                        so_hop_dong=so_hd_clean, ma_de_nghi=ma_dntt_clean,
+                        dia_chi=pt_dc.strip(), sdt=pt_sdt.strip(),
+                        nguoi_thu=pt_nguoi_thu.strip(),
+                        ngay_thu=pt_ngay_thu.strftime("%d/%m/%Y"),
+                        ghi_chu=pt_ghi_chu.strip(),
                     )
                     ma_pt      = result["ma_phieu_thu"]
                     data_extra = result["data_extra"]
@@ -1064,6 +1155,7 @@ with tab_pt:
                     if docx_path.startswith("LOI:"):
                         st.error(f"❌ {docx_path}")
                     else:
+                        write_log(current_user, "TAO_PHIEU_THU", f"KH: {pt_nguoi_nop.strip()} | Mã: {ma_pt} | Số tiền: {int(pt_so_tien):,}đ")
                         st.success(f"✅ Đã tạo **{ma_pt}** · Đã lưu Google Drive")
                         col1, col2 = st.columns(2)
                         col1.metric("Số tiền đã thu", f"{int(pt_so_tien):,}".replace(",", ".") + " đ")
@@ -1075,3 +1167,87 @@ with tab_pt:
                                 type="primary")
                 except Exception as e:
                     st.error(f"❌ Lỗi: {e}")
+
+
+# ══════════════════════════════════════════════
+# TAB 6 — LOG HOẠT ĐỘNG (chỉ admin)
+# ══════════════════════════════════════════════
+if tab_log is not None:
+    with tab_log:
+        st.markdown("### 🔐 Log Hoạt Động Nhân Viên")
+        st.caption("Toàn bộ thao tác đăng nhập, tạo tài liệu, CRM đều được ghi lại")
+        st.divider()
+
+        logs = _load_log()
+
+        if not logs:
+            st.info("Chưa có log nào.")
+        else:
+            # Bộ lọc
+            fl1, fl2, fl3 = st.columns([2, 2, 1])
+            with fl1:
+                users_in_log = ["Tất cả"] + sorted(set(l.get("user","") for l in logs))
+                filter_user = st.selectbox("Lọc theo nhân viên", users_in_log)
+            with fl2:
+                actions_in_log = ["Tất cả"] + sorted(set(l.get("action","") for l in logs))
+                filter_action = st.selectbox("Lọc theo hành động", actions_in_log)
+            with fl3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                # Export log CSV
+                log_csv = io.StringIO()
+                lw = csv.writer(log_csv)
+                lw.writerow(["Thời gian","Nhân viên","Hành động","Chi tiết","IP"])
+                for l in logs:
+                    lw.writerow([l.get("time",""), l.get("user",""), l.get("action",""),
+                                  l.get("detail",""), l.get("ip","")])
+                st.download_button("↓ Export CSV", log_csv.getvalue().encode("utf-8-sig"),
+                    "log_hoatdong.csv", "text/csv", use_container_width=True)
+
+            # Lọc
+            filtered_logs = logs
+            if filter_user != "Tất cả":
+                filtered_logs = [l for l in filtered_logs if l.get("user") == filter_user]
+            if filter_action != "Tất cả":
+                filtered_logs = [l for l in filtered_logs if l.get("action") == filter_action]
+
+            # Hiển thị mới nhất trước
+            filtered_logs = list(reversed(filtered_logs))
+
+            st.markdown(f"**{len(filtered_logs)} bản ghi**")
+            st.divider()
+
+            # Header
+            h1,h2,h3,h4,h5 = st.columns([2,2,2,4,2])
+            for col, label in zip([h1,h2,h3,h4,h5], ["Thời gian","Nhân viên","Hành động","Chi tiết","IP"]):
+                col.markdown(f"**{label}**")
+            st.divider()
+
+            action_icons = {
+                "LOGIN":         "🟢",
+                "LOGIN_FAIL":    "🔴",
+                "AUTO_LOGOUT":   "🟡",
+                "LOGOUT":        "⚪",
+                "TAO_BAO_GIA":   "📄",
+                "TAO_HOP_DONG":  "📝",
+                "TAO_DNTT":      "💳",
+                "TAO_PHIEU_THU": "🧾",
+                "XUAT_WORD_BG":  "⬇️",
+                "XUAT_WORD_HD":  "⬇️",
+                "LUU_CRM":       "💾",
+                "LUU_CRM_HD":    "💾",
+                "THEM_KH_CRM":   "➕",
+                "CAP_NHAT_KH":   "✏️",
+                "XOA_KH":        "🗑",
+            }
+
+            for l in filtered_logs[:100]:  # Hiện tối đa 100 dòng
+                icon = action_icons.get(l.get("action",""), "•")
+                c1,c2,c3,c4,c5 = st.columns([2,2,2,4,2])
+                c1.caption(l.get("time",""))
+                c2.markdown(f"**{l.get('user','')}**")
+                c3.markdown(f"{icon} `{l.get('action','')}`")
+                c4.caption(l.get("detail",""))
+                c5.caption(l.get("ip",""))
+
+            if len(filtered_logs) > 100:
+                st.caption(f"_(Hiển thị 100/{len(filtered_logs)} bản ghi gần nhất — export CSV để xem tất cả)_")
