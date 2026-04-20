@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
+from streamlit_autorefresh import st_autorefresh
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from google.oauth2 import service_account
@@ -518,6 +519,8 @@ if not st.session_state.authenticated:
 # ĐÃ ĐĂNG NHẬP
 # ─────────────────────────────────────────────
 update_activity()
+# Tự động refresh mỗi 30 giây để đồng hồ đếm ngược và kiểm tra timeout
+st_autorefresh(interval=30000, key="auto_refresh")
 current_user = st.session_state.username
 remaining    = get_remaining_seconds()
 remaining_m  = remaining // 60
