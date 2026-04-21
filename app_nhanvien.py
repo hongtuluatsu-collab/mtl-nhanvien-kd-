@@ -216,7 +216,7 @@ def xuat_word(noi_dung: str, ten_file: str, loai: str = "bao_gia", data_extra: d
     "de_nghi_tt": "agents/word_de_nghi_tt.js",
     "phieu_thu":  "agents/word_phieu_thu.js",
     }
-    js_file = JS_MAP.get(loai, "agents/word_bao_gia.js")js_file = "agents/word_hop_dong.js" if loai == "hop_dong" else "agents/word_bao_gia.js"
+    js_file = JS_MAP.get(loai, "agents/word_bao_gia.js")
     try:
         result = subprocess.run(
             ["node", js_file, json_path, docx_path],
