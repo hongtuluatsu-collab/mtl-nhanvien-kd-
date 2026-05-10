@@ -114,7 +114,7 @@ function parseMilestones(total, pttt) {
 }
 
 function loadImg(names) {
-  const dirs=["data/mau",path.join(__dirname,"../data/mau"),"/app/data_static/mau",path.join(__dirname,"../data_static/mau")];
+  const dirs=[path.join(__dirname,"mau"),"data/mau",path.join(__dirname,"../data/mau")];
   for(const d of dirs) for(const n of names){
     const p=path.join(d,n);
     if(fs.existsSync(p)){const ext=path.extname(n).slice(1).toLowerCase();return{buf:fs.readFileSync(p),type:ext==="jpg"?"jpg":"png"};}
