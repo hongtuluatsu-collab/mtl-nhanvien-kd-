@@ -186,7 +186,9 @@ def _find_file_id(service, filename):
 def _upload_to_drive(content_bytes, filename, mimetype):
     service = _get_drive_service()
     if not service:
+        print("[Drive] SKIP - service is None")
         return
+    print(f"[Drive] Uploading {filename}...")
     try:
         media = MediaIoBaseUpload(io.BytesIO(content_bytes), mimetype=mimetype, resumable=False)
         file_id = _find_file_id(service, filename)
