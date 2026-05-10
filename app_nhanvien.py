@@ -311,7 +311,7 @@ def expand_pham_vi_with_ai(pham_vi, loai_dich_vu):
 
     # Đếm số dòng/items đã có
     lines = [l.strip() for l in pham_vi.replace(";", "\n").split("\n") if l.strip()]
-    if len(lines) >= 8:
+    if len(lines) >= 4:
         return "\n".join(lines)
 
     prompt = f"""Bạn là luật sư đang soạn Điều 1 (Đối tượng) cho Hợp đồng Dịch vụ Pháp lý.
@@ -319,7 +319,7 @@ def expand_pham_vi_with_ai(pham_vi, loai_dich_vu):
 Loại dịch vụ: {loai_dich_vu}
 Phạm vi tổng quát do Khách hàng yêu cầu: {pham_vi}
 
-Hãy mở rộng thành 8-10 hạng mục công việc cụ thể mà Luật Minh Tú sẽ thực hiện.
+Hãy mở rộng thành 5-6 hạng mục công việc cụ thể mà Luật Minh Tú sẽ thực hiện.
 
 YÊU CẦU OUTPUT:
 - Mỗi hạng mục là 1 câu rõ ràng, bắt đầu bằng động từ pháp lý (Tư vấn / Soạn thảo / Thu thập / Đại diện / Tham gia / Theo dõi...)
@@ -338,7 +338,7 @@ Theo dõi quá trình thi hành án sau khi có bản án có hiệu lực
 """
 
     try:
-        result = call_claude(prompt, max_tokens=1000)
+        result = call_claude(prompt, max_tokens=600)
         # Clean output
         lines = [l.strip() for l in result.split("\n") if l.strip()]
         # Bỏ các dòng có dấu hiệu intro/outro
@@ -346,7 +346,7 @@ Theo dõi quá trình thi hành án sau khi có bản án có hiệu lực
         # Bỏ prefix nếu AI lỡ thêm số/bullet
         lines = [re.sub(r"^[\-–•\d]+[.)\s]+", "", l).strip() for l in lines]
         lines = [l for l in lines if l]
-        return "\n".join(lines[:10]) if lines else pham_vi
+        return "\n".join(lines[:6]) if lines else pham_vi
     except Exception:
         return pham_vi  # Fallback nếu AI fail
 
@@ -728,6 +728,7 @@ if st.sidebar.button("🔌 Test kết nối Drive"):
     except Exception as e:
         st.sidebar.error(f"❌ {str(e)[:300]}")
 
+
 # ─────────────────────────────────────────────
 # TABS
 # ─────────────────────────────────────────────
@@ -929,11 +930,6 @@ with tab_hd:
         with c4:
             hd_thoihan=st.selectbox("Thời hạn hợp đồng", [
                 "Đến khi hoàn thành vụ việc","3 tháng","6 tháng","12 tháng","24 tháng"])
-        hd_cn=st.selectbox("Chi nhánh ký hợp đồng", [
-            "Trụ sở — TP. Hồ Chí Minh",
-            "Chi nhánh Đà Nẵng",
-            "Chi nhánh Sài Gòn",
-        ])
         hd_scope=st.text_area(
             "Phạm vi dịch vụ / Mô tả vụ việc *",
             value=_val("mota") or _val("ghichu"),
@@ -977,7 +973,6 @@ with tab_hd:
                 "dia_chi": hd_diachi, "sdt": hd_sdt, "email": hd_email,
                 "loai_vu": hd_loai, "loai_dich_vu": hd_loai,
                 "pham_vi": pham_vi_expanded,
-                "chi_nhanh": hd_cn,
                 "tong_phi_raw": phi_total, "tong_phi_fmt": fmt_currency(phi_total),
                 "phuong_thuc_tt": hd_tt, "thoi_han": hd_thoihan,
                 "ngay_lap": today_str(), "noi_dung": noi_dung,
@@ -1023,7 +1018,7 @@ with tab_hd:
                 else:
                     crm.insert(0,{"id":str(int(datetime.now().timestamp()*1000)),
                         "ten":raw["ten"],"sdt":raw["sdt"],"email":raw["email"],"diachi":raw["diachi"],
-                        "loai":raw["loai"],"phi":raw["phi"],"duan":"","ghichu":"","ma_bg":"","chi_nhanh":r["data_extra"].get("chi_nhanh",""),
+                        "loai":raw["loai"],"phi":raw["phi"],"duan":"","ghichu":"","ma_bg":"",
                         "ngay_bg":today_str(),"trang_thai":"hopdong","hop_dong":hd_info,
                         "created_at":datetime.now().isoformat()})
                     st.success("Đã thêm KH!")
@@ -1299,23 +1294,6 @@ if tab_log is not None:
         st.caption("Toàn bộ thao tác đăng nhập, tạo tài liệu, CRM đều được ghi lại")
         st.divider()
         logs=_load_log()
-        if st.button("🔌 Test kết nối Drive", type="primary"):
-    try:
-        svc = _get_drive_service()
-        if not svc:
-            st.error("❌ Không có GOOGLE_CREDENTIALS")
-        else:
-            res = svc.files().list(
-                q=f"'{DRIVE_FOLDER_ID}' in parents and trashed=false",
-                fields="files(id,name)", pageSize=5
-            ).execute()
-            files = res.get("files", [])
-            st.success(f"✅ Drive OK — {len(files)} file trong folder")
-            for f in files:
-                st.caption(f"📄 {f['name']}")
-    except Exception as e:
-        st.error(f"❌ Lỗi: {str(e)[:300]}")
-st.divider()
         if not logs: st.info("Chưa có log.")
         else:
             fl1,fl2,fl3=st.columns([2,2,1])
