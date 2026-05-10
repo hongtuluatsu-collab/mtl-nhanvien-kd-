@@ -1068,15 +1068,41 @@ if can_see_crm and tab_crm is not None:
             with st.expander("➕ Thêm KH mới",expanded=True):
                 with st.form("form_add_crm"):
                     a1,a2=st.columns(2)
-                    with a1: add_ten=st.text_input("Họ tên *"); add_email=st.text_input("Email"); add_loai=st.text_input("Loại dịch vụ")
-                    with a2: add_sdt=st.text_input("Điện thoại"); add_diachi=st.text_input("Địa chỉ"); add_phi=st.text_input("Phí dự kiến (VNĐ)")
+                    with a1:
+                        add_ten=st.text_input("Họ tên / Tên doanh nghiệp *")
+                        add_cccd=st.text_input("CCCD / MST *")
+                        add_sdt=st.text_input("Số điện thoại *")
+                        add_email=st.text_input("Email")
+                    with a2:
+                        add_diachi=st.text_input("Địa chỉ *")
+                        add_loai=st.selectbox("Loại vụ việc *", [
+                            "— Chọn lĩnh vực —",
+                            "Tranh chấp đất đai / Bất động sản",
+                            "Hôn nhân & Gia đình (ly hôn, giám hộ)",
+                            "Hình sự (bào chữa / bị hại)",
+                            "Tranh chấp hợp đồng thương mại",
+                            "Thành lập / Giải thể doanh nghiệp",
+                            "Sở hữu trí tuệ (nhãn hiệu, bản quyền)",
+                            "Lao động (sa thải, tranh chấp lương)",
+                            "Tư vấn pháp luật theo tháng",
+                            "Soạn thảo hợp đồng",
+                            "Khác",
+                        ])
+                        add_phi=st.text_input("Phí dự kiến (VNĐ)")
                     add_ghichu=st.text_area("Ghi chú",height=70)
                     add_ts=st.selectbox("Trạng thái",["tiemnang","baogia","hopdong"])
                     if st.form_submit_button("Lưu",type="primary"):
-                        if not add_ten.strip(): st.error("Vui lòng nhập tên KH.")
+                        errors=[]
+                        if not add_ten.strip(): errors.append("Họ tên")
+                        if not add_cccd.strip(): errors.append("CCCD/MST")
+                        if not add_sdt.strip(): errors.append("Số điện thoại")
+                        if not add_diachi.strip(): errors.append("Địa chỉ")
+                        if add_loai == "— Chọn lĩnh vực —": errors.append("Loại vụ việc")
+                        if errors:
+                            st.error(f"Vui lòng nhập đầy đủ: **{', '.join(errors)}**")
                         else:
                             new_kh={"id":str(int(datetime.now().timestamp()*1000)),"ten":add_ten,"sdt":add_sdt,
-                                    "email":add_email,"diachi":add_diachi,"loai":add_loai,
+                                    "email":add_email,"diachi":add_diachi,"loai":add_loai,"cccd":add_cccd,
                                     "phi":re.sub(r"\D","",add_phi),"duan":"","ghichu":add_ghichu,
                                     "ma_bg":"","ngay_bg":today_str(),"trang_thai":add_ts,"hop_dong":None,
                                     "created_at":datetime.now().isoformat()}
