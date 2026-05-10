@@ -3,6 +3,13 @@ app_nhanvien.py — Minh Tú Law | Nhân Viên Kinh Doanh
 5 chức năng: Tạo Báo Giá · Tạo Hợp Đồng · CRM · Đề Nghị Thanh Toán · Phiếu Thu
 Bảo mật: Tài khoản riêng · Tự động đăng xuất 5 phút · Log hoạt động
 Google Drive: tự động sync CRM + tất cả file docx
+
+Phiên bản: v2 — 10/05/2026
+Thay đổi:
+  • VAT 10% → 8% (theo Nghị quyết giảm thuế VAT hiện hành)
+  • Tab Hợp Đồng: BỎ AI generation, dùng render template cứng → Preview = Word 100%
+  • Thêm field "pham_vi" vào data_extra HĐ để JS render scope đúng
+  • Caption HĐ "10 điều khoản" → "8 điều khoản"
 """
 import streamlit as st
 import os, json, re, csv, io, subprocess
@@ -313,6 +320,136 @@ def fmt_currency(val) -> str:
 def today_str() -> str:
     return datetime.now().strftime("%d/%m/%Y")
 
+
+# ─────────────────────────────────────────────
+# RENDER PREVIEW HỢP ĐỒNG (8 Điều, khớp template Word)
+# ─────────────────────────────────────────────
+def render_hop_dong_text(so_hd, ten_than_chu, cmnd, dia_chi, sdt, email,
+                         loai_dich_vu, pham_vi, phi_raw, phi_vat, phi_total,
+                         phuong_thuc_tt, thoi_han) -> str:
+    """Render text hợp đồng — khớp 1-1 với template Word (word_hop_dong.js)."""
+    scope_lines = [l.strip() for l in (pham_vi or "").split("\n") if l.strip()]
+    if scope_lines:
+        scope_text = "\n".join([f"   – {l}" for l in scope_lines])
+    else:
+        scope_text = f"   – {loai_dich_vu}"
+
+    return f"""HỢP ĐỒNG DỊCH VỤ PHÁP LÝ
+Số: {so_hd}  |  Ngày: {today_str()}
+
+═══════════════════════════════════════════════════════════
+THÔNG TIN CÁC BÊN
+═══════════════════════════════════════════════════════════
+
+BÊN A — BÊN CUNG CẤP DỊCH VỤ
+   CÔNG TY LUẬT TNHH MINH TÚ
+   GPĐKHĐ: 41.02.4764/TP/ĐKHĐ  |  MST: 0318941023
+   Địa chỉ: 4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, Q.3, TP.HCM
+   ĐT: 1900 0031  |  Email: votu@luatminhtu.vn
+   Đại diện: Ông Võ Hồng Tú — Giám đốc / Luật sư điều hành
+
+BÊN B — BÊN SỬ DỤNG DỊCH VỤ
+   Tên: {ten_than_chu}
+   CCCD/MST: {cmnd or '___________'}
+   Địa chỉ: {dia_chi or '___________'}
+   SĐT: {sdt or '___________'}  |  Email: {email or '___________'}
+
+═══════════════════════════════════════════════════════════
+CĂN CỨ PHÁP LÝ
+═══════════════════════════════════════════════════════════
+   – Căn cứ Hiến pháp nước CHXHCN Việt Nam năm 2013;
+   – Căn cứ Bộ luật Dân sự năm 2015;
+   – Căn cứ Luật Luật sư năm 2006, sửa đổi bổ sung năm 2012;
+   – Căn cứ nhu cầu và thỏa thuận của các Bên.
+
+Hai Bên thống nhất ký kết Hợp đồng Dịch vụ Pháp lý này với các điều khoản sau:
+
+═══════════════════════════════════════════════════════════
+NỘI DUNG HỢP ĐỒNG
+═══════════════════════════════════════════════════════════
+
+ĐIỀU 1. ĐỐI TƯỢNG CỦA HỢP ĐỒNG
+Bên B đồng ý chọn Bên A là đơn vị tư vấn pháp lý và thực hiện các dịch vụ sau:
+{scope_text}
+
+ĐIỀU 2. PHÍ DỊCH VỤ VÀ PHƯƠNG THỨC THANH TOÁN
+   Phí dịch vụ (chưa VAT): {fmt_currency(phi_raw)} đ
+   Thuế VAT (8%):          {fmt_currency(phi_vat)} đ
+   ─────────────────────────────────────────
+   TỔNG PHÍ DỊCH VỤ:       {fmt_currency(phi_total)} đ (đã bao gồm VAT)
+
+   Phương thức thanh toán: {phuong_thuc_tt}
+
+   Tài khoản nhận thanh toán:
+      – Tên TK: CTY LUAT TNHH MINH TU
+      – STK: 5150056789
+      – Ngân hàng: MB Bank (TMCP Quân Đội) — CN Phú Nhuận, TP.HCM
+      – Nội dung CK: [Họ tên] — Phí DV — {so_hd}
+
+   Sau 03 ngày làm việc kể từ khi nhận đủ phí, Bên A xuất hóa đơn VAT.
+
+ĐIỀU 3. QUYỀN VÀ NGHĨA VỤ CỦA BÊN A
+Nghĩa vụ:
+   – Thực hiện công việc đúng chất lượng, khối lượng và thời hạn cam kết;
+   – Không chuyển giao công việc cho bên thứ ba khi chưa được Bên B đồng ý;
+   – Thông báo và xin ý kiến Bên B trước khi ban hành tài liệu cần phê duyệt;
+   – Bảo mật toàn bộ thông tin của Bên B trong và sau khi thực hiện hợp đồng;
+   – Bàn giao tài liệu, hồ sơ sau khi hoàn tất công việc;
+   – Bồi thường nếu làm mất, hư hỏng tài sản hoặc để lộ thông tin mật của Bên B.
+Quyền:
+   – Yêu cầu Bên B cung cấp thông tin, tài liệu phục vụ công việc;
+   – Nhận đầy đủ thù lao theo thỏa thuận tại Điều 2;
+   – Yêu cầu Bên B phối hợp khi cần có mặt hoặc ý kiến trực tiếp;
+   – Đơn phương chấm dứt hợp đồng và yêu cầu bồi thường nếu Bên B vi phạm nghiêm trọng.
+
+ĐIỀU 4. QUYỀN VÀ NGHĨA VỤ CỦA BÊN B
+Nghĩa vụ:
+   – Cung cấp đầy đủ thông tin, tài liệu và phương tiện cần thiết cho Bên A;
+   – Thanh toán đầy đủ và đúng hạn phí dịch vụ theo thỏa thuận;
+   – Đảm bảo tính chính xác, trung thực của tài liệu cung cấp;
+   – Bồi thường thiệt hại nếu đơn phương chấm dứt hợp đồng không có lý do chính đáng.
+Quyền:
+   – Được Bên A tư vấn pháp lý, soạn thảo văn bản và cập nhật tiến độ;
+   – Đơn phương chấm dứt hợp đồng và yêu cầu bồi thường nếu Bên A vi phạm nghiêm trọng;
+   – Hưởng các quyền lợi khác theo quy định pháp luật Việt Nam.
+
+ĐIỀU 5. THỜI HẠN
+Thời hạn thực hiện hợp đồng: {thoi_han}.
+Trong trường hợp kéo dài, hai Bên thỏa thuận bằng phụ lục hợp đồng.
+
+ĐIỀU 6. HIỆU LỰC
+Hợp đồng có hiệu lực kể từ ngày các Bên ký tên xác nhận, và kết thúc khi:
+   – Đã hết thời hạn tại Điều 5 và các Bên đồng ý chấm dứt;
+   – Khi công việc được hoàn thành theo Điều 1;
+   – Một trong các Bên đơn phương chấm dứt theo thỏa thuận hoặc theo pháp luật.
+Ngoài các trường hợp nêu trên, Hợp đồng không thể hủy ngang.
+
+ĐIỀU 7. GIẢI QUYẾT TRANH CHẤP
+Khi phát sinh tranh chấp, các Bên ưu tiên thương lượng, hòa giải.
+Nếu hòa giải không thành, một Bên có quyền khởi kiện ra Tòa án nhân dân
+có thẩm quyền tại TP. Hồ Chí Minh để giải quyết theo pháp luật Việt Nam.
+
+ĐIỀU 8. CAM KẾT CHUNG
+Trước khi ký Hợp đồng này, các Bên đã tìm hiểu kỹ về tư cách, thẩm quyền,
+năng lực của nhau. Các Bên ký Hợp đồng trong trạng thái hoàn toàn tự nguyện,
+tự do ý chí, không bị ép buộc.
+
+Hợp đồng được lập tại 4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, Q.3, TP.HCM,
+thành 02 bản chính tiếng Việt có giá trị pháp lý như nhau, mỗi Bên giữ 01 bản.
+
+═══════════════════════════════════════════════════════════
+KÝ KẾT
+═══════════════════════════════════════════════════════════
+
+ĐẠI DIỆN BÊN A                          ĐẠI DIỆN BÊN B
+VÕ HỒNG TÚ                              {ten_than_chu.upper()}
+Giám đốc / Luật sư điều hành            Bên sử dụng dịch vụ
+"""
+
+
+# ─────────────────────────────────────────────
+# CRM
+# ─────────────────────────────────────────────
 def load_crm() -> list:
     service = _get_drive_service()
     if service:
@@ -646,7 +783,7 @@ with tab_bg:
             st.error(f"Vui lòng nhập đầy đủ: **{', '.join(errors)}**")
         else:
             ma_bg=gen_ma_bg(); phi_raw=int(re.sub(r"\D","",bg_phi) or "0")
-            phi_vat=round(phi_raw*0.1); phi_total=phi_raw+phi_vat
+            phi_vat=round(phi_raw*0.08); phi_total=phi_raw+phi_vat   # ← VAT 8%
             prompt = f"""Soạn THƯ BÁO PHÍ DỊCH VỤ PHÁP LÝ:
 Mã: {ma_bg} | Ngày: {today_str()} | KH: {bg_ten} | SĐT: {bg_sdt or '—'} | Email: {bg_email or '—'}
 Địa chỉ: {bg_diachi or '—'} | Loại vụ: {bg_loai} | Vụ việc: {bg_duan or bg_loai} | Cách tính: {bg_cach}
@@ -659,7 +796,7 @@ I. PHẠM VI DỊCH VỤ — 5-6 hạng mục, mỗi hạng mục:
 
 II. BẢNG PHÍ DỊCH VỤ
 Phí dịch vụ (chưa VAT): {fmt_currency(phi_raw)}đ
-Thuế VAT (10%): {fmt_currency(phi_vat)}đ
+Thuế VAT (8%): {fmt_currency(phi_vat)}đ
 Tổng phí phải thanh toán: {fmt_currency(phi_total)}đ
 (bằng chữ: [viết bằng chữ])
 
@@ -739,11 +876,11 @@ Văn phong pháp lý trang trọng. Không dùng markdown, #, *, **.
 
 
 # ══════════════════════════════════════════════
-# TAB 2 — TẠO HỢP ĐỒNG
+# TAB 2 — TẠO HỢP ĐỒNG (KHÔNG dùng AI — render template để Preview = Word)
 # ══════════════════════════════════════════════
 with tab_hd:
     st.markdown("### Hợp Đồng Dịch Vụ Pháp Lý")
-    st.caption("10 điều khoản chuẩn pháp lý Việt Nam · Tự điền từ CRM hoặc báo giá đã duyệt")
+    st.caption("8 điều khoản chuẩn pháp lý Việt Nam · Tự điền từ CRM hoặc báo giá đã duyệt")
     st.divider()
 
     prefill = st.session_state.pop("_prefill_hd", {})
@@ -785,7 +922,7 @@ with tab_hd:
                 "Đến khi hoàn thành vụ việc","3 tháng","6 tháng","12 tháng","24 tháng"])
         hd_scope=st.text_area("Phạm vi dịch vụ / Công việc cụ thể *",
             value=_val("mota") or _val("ghichu"), height=120)
-        submitted_hd = st.form_submit_button("✦ AI Soạn Hợp Đồng", type="primary", use_container_width=True)
+        submitted_hd = st.form_submit_button("✦ Soạn Hợp Đồng", type="primary", use_container_width=True)
 
     if submitted_hd:
         errors = []
@@ -796,41 +933,35 @@ with tab_hd:
         if errors:
             st.error(f"Vui lòng nhập đầy đủ: **{', '.join(errors)}**")
         else:
-            phi_raw=int(re.sub(r"\D","",hd_phi) or "0"); phi_vat=round(phi_raw*0.1); phi_total=phi_raw+phi_vat
-            prompt = f"""Soạn HỢP ĐỒNG DỊCH VỤ PHÁP LÝ chuẩn pháp lý Việt Nam:
-Số HĐ: {hd_so} | Ngày: {today_str()}
-BÊN A: CÔNG TY LUẬT TNHH MINH TÚ | GPĐKHĐ: 41.02.4764/TP/ĐKHĐ | MST: 0318941023
-  LS. Võ Hồng Tú — Giám đốc | Trụ sở: 4/9 Đường số 3, CX Đô Thành, P.Bàn Cờ, TP.HCM
-  CN Đà Nẵng: 81 Xô Viết Nghệ Tĩnh, P.Cẩm Lệ, TP.Đà Nẵng | Hotline: 1900 0031
-BÊN B: {hd_ten} | CMND/MST: {hd_cmnd or '___'} | Địa chỉ: {hd_diachi or '___'}
-  SĐT: {hd_sdt or '___'} | Email: {hd_email or '___'}
-Dịch vụ: {hd_loai} | Phạm vi: {hd_scope}
-Phí chưa VAT: {fmt_currency(phi_raw)}đ | VAT 10%: {fmt_currency(phi_vat)}đ | Tổng: {fmt_currency(phi_total)}đ
-Thanh toán: {hd_tt} | Thời hạn: {hd_thoihan}
-TK: CTY LUAT TNHH MINH TU | STK: 5150056789 | MB Bank CN Phú Nhuận
-Soạn đủ 10 điều khoản. Không dùng markdown, #, *, **.
-"""
-            with st.spinner("AI đang soạn hợp đồng..."):
-                try:
-                    noi_dung = call_claude(prompt, max_tokens=3000)
-                    data_extra = {
-                        "so_hop_dong": hd_so, "ten_than_chu": hd_ten, "cmnd": hd_cmnd,
-                        "dia_chi": hd_diachi, "sdt": hd_sdt, "email": hd_email,
-                        "loai_vu": hd_loai, "loai_dich_vu": hd_loai,
-                        "tong_phi_raw": phi_total, "tong_phi_fmt": fmt_currency(phi_total),
-                        "phuong_thuc_tt": hd_tt, "thoi_han": hd_thoihan,
-                        "ngay_lap": today_str(), "noi_dung": noi_dung,
-                    }
-                    st.session_state.hd_result = {
-                        "so_hd": hd_so, "noi_dung": noi_dung, "data_extra": data_extra,
-                        "raw": {"ten": hd_ten, "sdt": hd_sdt, "email": hd_email,
-                                "diachi": hd_diachi, "loai": hd_loai, "phi": str(phi_raw)},
-                    }
-                    update_activity()
+            phi_raw=int(re.sub(r"\D","",hd_phi) or "0")
+            phi_vat=round(phi_raw*0.08)   # ← VAT 8%
+            phi_total=phi_raw+phi_vat
 
-                    write_log(current_user, "TAO_HOP_DONG", f"KH: {hd_ten} | Số HĐ: {hd_so}")
-                except Exception as e:
-                    st.error(f"Lỗi AI: {e}")
+            # Render template — KHÔNG gọi AI
+            noi_dung = render_hop_dong_text(
+                so_hd=hd_so, ten_than_chu=hd_ten, cmnd=hd_cmnd,
+                dia_chi=hd_diachi, sdt=hd_sdt, email=hd_email,
+                loai_dich_vu=hd_loai, pham_vi=hd_scope,
+                phi_raw=phi_raw, phi_vat=phi_vat, phi_total=phi_total,
+                phuong_thuc_tt=hd_tt, thoi_han=hd_thoihan,
+            )
+
+            data_extra = {
+                "so_hop_dong": hd_so, "ten_than_chu": hd_ten, "cmnd": hd_cmnd,
+                "dia_chi": hd_diachi, "sdt": hd_sdt, "email": hd_email,
+                "loai_vu": hd_loai, "loai_dich_vu": hd_loai,
+                "pham_vi": hd_scope,                       # ← QUAN TRỌNG
+                "tong_phi_raw": phi_total, "tong_phi_fmt": fmt_currency(phi_total),
+                "phuong_thuc_tt": hd_tt, "thoi_han": hd_thoihan,
+                "ngay_lap": today_str(), "noi_dung": noi_dung,
+            }
+            st.session_state.hd_result = {
+                "so_hd": hd_so, "noi_dung": noi_dung, "data_extra": data_extra,
+                "raw": {"ten": hd_ten, "sdt": hd_sdt, "email": hd_email,
+                        "diachi": hd_diachi, "loai": hd_loai, "phi": str(phi_raw)},
+            }
+            update_activity()
+            write_log(current_user, "TAO_HOP_DONG", f"KH: {hd_ten} | Số HĐ: {hd_so}")
 
     if st.session_state.hd_result:
         r = st.session_state.hd_result
