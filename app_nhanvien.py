@@ -33,7 +33,7 @@ st.set_page_config(
     page_title="MTL — Nhân Viên Kinh Doanh",
     page_icon="⚖️",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 API_KEY         = os.getenv("ANTHROPIC_API_KEY", "")
