@@ -197,8 +197,8 @@ def _upload_to_drive(content_bytes, filename, mimetype):
                 body={"name": filename, "parents": [DRIVE_FOLDER_ID]},
                 media_body=media, fields="id",
             ).execute()
-    except Exception:
-        pass
+    except Exception as _e:
+        print(f"[ERR] {_e}")
 
 
 # ─────────────────────────────────────────────
@@ -210,8 +210,8 @@ def _load_log():
         f.parent.mkdir(parents=True, exist_ok=True)
         if f.exists():
             return json.loads(f.read_text(encoding="utf-8"))
-    except Exception:
-        pass
+    except Exception as _e:
+        print(f"[ERR] {_e}")
     return []
 
 def _save_log(logs):
@@ -224,8 +224,8 @@ def _save_log(logs):
             json.dumps(logs, ensure_ascii=False, indent=2).encode("utf-8"),
             LOG_FILENAME, "application/json"
         )
-    except Exception:
-        pass
+    except Exception as _e:
+        print(f"[ERR] {_e}")
 
 def write_log(username, action, detail=""):
     logs = _load_log()
@@ -499,8 +499,8 @@ def load_crm():
         f.parent.mkdir(parents=True, exist_ok=True)
         if f.exists():
             return json.loads(f.read_text(encoding="utf-8"))
-    except Exception:
-        pass
+    except Exception as _e:
+        print(f"[ERR] {_e}")
     return []
 
 def save_crm(data):
@@ -509,8 +509,8 @@ def save_crm(data):
         f = Path("data/crm.json")
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(content)
-    except Exception:
-        pass
+    except Exception as _e:
+        print(f"[ERR] {_e}")
     _upload_to_drive(content, CRM_FILENAME, "application/json")
 
 def status_label(s):
