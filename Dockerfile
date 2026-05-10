@@ -17,7 +17,8 @@ RUN npm install
 
 # Copy all source files
 COPY . .
-
+RUN mkdir -p /app/data_static/mau && \
+    cp -r /app/data/mau/. /app/data_static/mau/ 2>/dev/null || true
 # Create data directories
 RUN mkdir -p data/hop_dong data/crm data/mau
 
