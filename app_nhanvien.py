@@ -913,6 +913,11 @@ with tab_hd:
         with c4:
             hd_thoihan=st.selectbox("Thời hạn hợp đồng", [
                 "Đến khi hoàn thành vụ việc","3 tháng","6 tháng","12 tháng","24 tháng"])
+        hd_cn=st.selectbox("Chi nhánh ký hợp đồng", [
+            "Trụ sở — TP. Hồ Chí Minh",
+            "Chi nhánh Đà Nẵng",
+            "Chi nhánh Sài Gòn",
+        ])
         hd_scope=st.text_area(
             "Phạm vi dịch vụ / Mô tả vụ việc *",
             value=_val("mota") or _val("ghichu"),
@@ -956,6 +961,7 @@ with tab_hd:
                 "dia_chi": hd_diachi, "sdt": hd_sdt, "email": hd_email,
                 "loai_vu": hd_loai, "loai_dich_vu": hd_loai,
                 "pham_vi": pham_vi_expanded,
+                "chi_nhanh": hd_cn,
                 "tong_phi_raw": phi_total, "tong_phi_fmt": fmt_currency(phi_total),
                 "phuong_thuc_tt": hd_tt, "thoi_han": hd_thoihan,
                 "ngay_lap": today_str(), "noi_dung": noi_dung,
@@ -1001,7 +1007,7 @@ with tab_hd:
                 else:
                     crm.insert(0,{"id":str(int(datetime.now().timestamp()*1000)),
                         "ten":raw["ten"],"sdt":raw["sdt"],"email":raw["email"],"diachi":raw["diachi"],
-                        "loai":raw["loai"],"phi":raw["phi"],"duan":"","ghichu":"","ma_bg":"",
+                        "loai":raw["loai"],"phi":raw["phi"],"duan":"","ghichu":"","ma_bg":"","chi_nhanh":r["data_extra"].get("chi_nhanh",""),
                         "ngay_bg":today_str(),"trang_thai":"hopdong","hop_dong":hd_info,
                         "created_at":datetime.now().isoformat()})
                     st.success("Đã thêm KH!")

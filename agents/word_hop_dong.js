@@ -41,9 +41,16 @@ const {
   thoi_han       = "Đến khi hoàn thành vụ việc",
   ngay_lap       = new Date().toLocaleDateString("vi-VN"),
   noi_dung       = "",
+  chi_nhanh      = "Trụ sở — TP. Hồ Chí Minh",
 } = D;
 
 // ── COLORS ──────────────────────────────────────────────
+const CN_DIA_CHI = {
+  "Trụ sở — TP. Hồ Chí Minh": "4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, Q.3, TP.HCM",
+  "Chi nhánh Đà Nẵng":         "81 Xô Viết Nghệ Tĩnh, P. Cẩm Lệ, TP. Đà Nẵng",
+  "Chi nhánh Sài Gòn":         "TP. Hồ Chí Minh",
+};
+const dia_chi_lap = CN_DIA_CHI[chi_nhanh] || "4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, Q.3, TP.HCM";
 const NAVY  = "1B4A7A";
 const NAVY2 = "163D66";
 const GOLD  = "B8973A";
@@ -485,7 +492,7 @@ function t5_articles(F){
 
     DIEU("Điều 8","Cam kết chung"),
     P([R("Trước khi ký Hợp đồng này, các Bên đã tìm hiểu kỹ về tư cách, thẩm quyền, năng lực của nhau. Các Bên ký Hợp đồng trong trạng thái hoàn toàn tự nguyện, tự do ý chí, không bị ép buộc.",{size:SZ.md,color:SLATE})],{before:0,after:20}),
-    P([R("Hợp đồng được lập tại 4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, Q.3, TP.HCM, thành 02 bản chính tiếng Việt có giá trị pháp lý như nhau, mỗi Bên giữ 01 bản.",{size:SZ.md,color:SLATE})],{before:0,after:60}),
+    P([R("Hợp đồng được lập tại "+dia_chi_lap+", thành 03 bản chính tiếng Việt có giá trị pháp lý như nhau, Bên A giữ 02 bản, Bên B giữ 01 bản.",{size:SZ.md,color:SLATE})],{before:0,after:60}),
   ];
 
   return new Table({
@@ -580,7 +587,7 @@ function t8_footer(){
       CELL(P([R(`© ${new Date().getFullYear()} Minhtu Law Co., Ltd  ·  GPĐKHĐ: 41.02.4764/TP/ĐKHĐ  ·  MST: 0318941023  ·  luatminhtu.vn`,{size:SZ.xs,color:"AABCCC"})],
              {align:AlignmentType.LEFT,before:80,after:80}),
         {w:wL,bg:NAVY,borders:B_NONE,margins:{top:60,bottom:60,left:180,right:100}}),
-      CELL(P([R(so_hop_dong,{bold:true,size:SZ.xs,color:NAVY})],{align:AlignmentType.CENTER,before:80,after:80}),
+      CELL(P([R(chi_nhanh+"  ·  "+so_hop_dong,{bold:true,size:SZ.xs,color:NAVY})],{align:AlignmentType.CENTER,before:80,after:80}),
         {w:wR,bg:GOLD,borders:B_NONE}),
     ]})],
     borders:TB_NONE,
