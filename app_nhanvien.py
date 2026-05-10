@@ -311,7 +311,7 @@ def expand_pham_vi_with_ai(pham_vi, loai_dich_vu):
 
     # Đếm số dòng/items đã có
     lines = [l.strip() for l in pham_vi.replace(";", "\n").split("\n") if l.strip()]
-    if len(lines) >= 4:
+    if len(lines) >= 8:
         return "\n".join(lines)
 
     prompt = f"""Bạn là luật sư đang soạn Điều 1 (Đối tượng) cho Hợp đồng Dịch vụ Pháp lý.
@@ -319,7 +319,7 @@ def expand_pham_vi_with_ai(pham_vi, loai_dich_vu):
 Loại dịch vụ: {loai_dich_vu}
 Phạm vi tổng quát do Khách hàng yêu cầu: {pham_vi}
 
-Hãy mở rộng thành 5-6 hạng mục công việc cụ thể mà Luật Minh Tú sẽ thực hiện.
+Hãy mở rộng thành 8-10 hạng mục công việc cụ thể mà Luật Minh Tú sẽ thực hiện.
 
 YÊU CẦU OUTPUT:
 - Mỗi hạng mục là 1 câu rõ ràng, bắt đầu bằng động từ pháp lý (Tư vấn / Soạn thảo / Thu thập / Đại diện / Tham gia / Theo dõi...)
@@ -346,7 +346,7 @@ Theo dõi quá trình thi hành án sau khi có bản án có hiệu lực
         # Bỏ prefix nếu AI lỡ thêm số/bullet
         lines = [re.sub(r"^[\-–•\d]+[.)\s]+", "", l).strip() for l in lines]
         lines = [l for l in lines if l]
-        return "\n".join(lines[:6]) if lines else pham_vi
+        return "\n".join(lines[:10]) if lines else pham_vi
     except Exception:
         return pham_vi  # Fallback nếu AI fail
 
