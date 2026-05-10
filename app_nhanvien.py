@@ -1299,6 +1299,23 @@ if tab_log is not None:
         st.caption("Toàn bộ thao tác đăng nhập, tạo tài liệu, CRM đều được ghi lại")
         st.divider()
         logs=_load_log()
+        if st.button("🔌 Test kết nối Drive", type="primary"):
+    try:
+        svc = _get_drive_service()
+        if not svc:
+            st.error("❌ Không có GOOGLE_CREDENTIALS")
+        else:
+            res = svc.files().list(
+                q=f"'{DRIVE_FOLDER_ID}' in parents and trashed=false",
+                fields="files(id,name)", pageSize=5
+            ).execute()
+            files = res.get("files", [])
+            st.success(f"✅ Drive OK — {len(files)} file trong folder")
+            for f in files:
+                st.caption(f"📄 {f['name']}")
+    except Exception as e:
+        st.error(f"❌ Lỗi: {str(e)[:300]}")
+st.divider()
         if not logs: st.info("Chưa có log.")
         else:
             fl1,fl2,fl3=st.columns([2,2,1])
