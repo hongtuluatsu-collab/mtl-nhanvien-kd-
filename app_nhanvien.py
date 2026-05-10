@@ -710,7 +710,23 @@ if st.sidebar.button("🚪 Đăng xuất", use_container_width=True, type="prima
 st.sidebar.divider()
 st.sidebar.caption("Hotline: 1900 0031")
 st.sidebar.caption("votu@luatminhtu.vn")
-
+st.sidebar.divider()
+if st.sidebar.button("🔌 Test kết nối Drive"):
+    try:
+        svc = _get_drive_service()
+        if not svc:
+            st.sidebar.error("❌ Không có GOOGLE_CREDENTIALS")
+        else:
+            res = svc.files().list(
+                q=f"'{DRIVE_FOLDER_ID}' in parents and trashed=false",
+                fields="files(id,name)", pageSize=5
+            ).execute()
+            files = res.get("files", [])
+            st.sidebar.success(f"✅ Drive OK — {len(files)} file")
+            for f in files:
+                st.sidebar.caption(f"📄 {f['name']}")
+    except Exception as e:
+        st.sidebar.error(f"❌ {str(e)[:300]}")
 
 # ─────────────────────────────────────────────
 # TABS
