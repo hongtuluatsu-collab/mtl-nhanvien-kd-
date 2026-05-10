@@ -252,8 +252,8 @@ function t4_fee(F){
 function t5_payment(total){
   const p1=Math.round(total*0.7),p2=total-p1;
   const rows_d=[
-    {n:"1",mile:"Ký hợp đồng dịch vụ",trigger:`Khi ký kết Hợp đồng Dịch vụ Pháp lý giữa Minhtu Law Co., Ltd và ${ten_than_chu}.`,amt:p1,pct:"70%"},
-    {n:"2",mile:"Hoàn tất vụ việc",trigger:`Sau khi hoàn tất vụ việc và bàn giao Báo cáo Hoàn thành cho ${ten_than_chu}.`,amt:p2,pct:"30%"},
+    {n:"1",mile:"Ký hợp đồng dịch vụ",trigger:`Khi ký kết Hợp đồng Dịch vụ Pháp lý giữa Minhtu Law Co., Ltd và ${ten_than_chu}.`,amt:p1,pct:"50%"},
+    {n:"2",mile:"Hoàn tất vụ việc",trigger:`Sau khi hoàn tất vụ việc và bàn giao Báo cáo Hoàn thành cho ${ten_than_chu}.`,amt:p2,pct:"50%"},
   ];
   const W0=360,W1=1440,W2=Math.round(PW*0.38),W3=Math.round(PW*0.20),W4=PW-W0-W1-W2-W3;
   const hdr=new TableRow({children:[
