@@ -338,7 +338,7 @@ Theo dõi quá trình thi hành án sau khi có bản án có hiệu lực
 """
 
     try:
-        result = call_claude(prompt, max_tokens=600)
+        result = call_claude(prompt, max_tokens=1000)
         # Clean output
         lines = [l.strip() for l in result.split("\n") if l.strip()]
         # Bỏ các dòng có dấu hiệu intro/outro
