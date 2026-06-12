@@ -47,7 +47,8 @@ const BG2   = "EBF2FA";
 const BG3   = "FAF5E8";
 const WHITE = "FFFFFF";
 const FONT  = "Times New Roman";
-const SZ = { xs:13, sm:14, sm2:15, md:16, md2:17, lg:19, xl:21, xxl:26, hero:30 };
+// Đơn vị = nửa point (half-point). md:24 = 12pt — cỡ chữ tiêu chuẩn, dễ đọc cho người lớn tuổi.
+const SZ = { xs:18, sm:20, sm2:21, md:24, md2:26, lg:28, xl:30, xxl:34, hero:40 };
 const PW = 9360;
 
 // ── UTILS ───────────────────────────────────────────────
@@ -84,7 +85,7 @@ function parseScope(text) {
 }
 
 function loadImg(names){
-  const dirs=[path.join(__dirname,"mau"),"data/mau",path.join(__dirname,"../data/mau")];
+  const dirs=["data/mau",path.join(__dirname,"../data/mau")];
   for(const d of dirs) for(const n of names){
     const p=path.join(d,n);
     if(fs.existsSync(p)){const ext=path.extname(n).slice(1).toLowerCase();return{buf:fs.readFileSync(p),type:ext==="jpg"?"jpg":"png"};}
@@ -206,7 +207,7 @@ function t2_statBoxes(F){
 }
 
 function t3_scope(items){
-  const W0=400,W1=PW-W0;
+  const W0=700,W1=PW-W0;
   const rows=items.map((it,i)=>{
     const bg=i%2===0?WHITE:BG1;
     return new TableRow({children:[
@@ -252,8 +253,8 @@ function t4_fee(F){
 function t5_payment(total){
   const p1=Math.round(total*0.7),p2=total-p1;
   const rows_d=[
-    {n:"1",mile:"Ký hợp đồng dịch vụ",trigger:`Khi ký kết Hợp đồng Dịch vụ Pháp lý giữa Minhtu Law Co., Ltd và ${ten_than_chu}.`,amt:p1,pct:"50%"},
-    {n:"2",mile:"Hoàn tất vụ việc",trigger:`Sau khi hoàn tất vụ việc và bàn giao Báo cáo Hoàn thành cho ${ten_than_chu}.`,amt:p2,pct:"50%"},
+    {n:"1",mile:"Ký hợp đồng dịch vụ",trigger:`Khi ký kết Hợp đồng Dịch vụ Pháp lý giữa Minhtu Law Co., Ltd và ${ten_than_chu}.`,amt:p1,pct:"70%"},
+    {n:"2",mile:"Hoàn tất vụ việc",trigger:`Sau khi hoàn tất vụ việc và bàn giao Báo cáo Hoàn thành cho ${ten_than_chu}.`,amt:p2,pct:"30%"},
   ];
   const W0=360,W1=1440,W2=Math.round(PW*0.38),W3=Math.round(PW*0.20),W4=PW-W0-W1-W2-W3;
   const hdr=new TableRow({children:[
@@ -347,7 +348,7 @@ function t6_banking(F){
     P([R("Tên tài khoản:",{bold:true,size:SZ.md,color:NAVY})],{before:80,after:8}),
     P([R("CTY LUAT TNHH MINH TU",{bold:true,size:SZ.lg,color:NAVY})],{before:0,after:14}),
     P([R("Số tài khoản:",{bold:true,size:SZ.md,color:NAVY})],{before:0,after:8}),
-    P([R("5150056789",{bold:true,size:SZ.xxl,color:NAVY})],{before:0,after:14}),
+    P([R("5158856789",{bold:true,size:SZ.xxl,color:NAVY})],{before:0,after:14}),
     P([R("Ngân hàng:",{bold:true,size:SZ.md,color:NAVY})],{before:0,after:6}),
     P([R("MB Bank (TMCP Quân Đội)",{bold:true,size:SZ.md,color:NAVY})],{before:0,after:4}),
     P([R("Chi nhánh Phú Nhuận, TP.HCM",{size:SZ.md,color:SLATE})],{before:0,after:14}),
@@ -364,7 +365,7 @@ function t6_banking(F){
   }
   rightCh.push(
     P([R("VietQR  ·  MB Bank",{bold:true,size:SZ.sm2,color:NAVY})],{align:AlignmentType.CENTER,before:14,after:4}),
-    P([R("STK: 5150056789",{size:SZ.md,color:SLATE})],{align:AlignmentType.CENTER,before:0,after:80}),
+    P([R("STK: 5158856789",{size:SZ.md,color:SLATE})],{align:AlignmentType.CENTER,before:0,after:80}),
   );
   const contentRow=new TableRow({children:[
     CELL(leftCh,{w:wL,bg:BG3,borders:B_CELL}),
@@ -433,7 +434,7 @@ function t9_footer(){
   return new Table({
     width:{size:PW,type:WidthType.DXA},columnWidths:[wL,wR],
     rows:[new TableRow({children:[
-      CELL(P([R(`© ${new Date().getFullYear()} Minhtu Law Co., Ltd  ·  TP. Hồ Chí Minh  ·  Strictly Private & Confidential`,{size:SZ.xs,color:"AABCCC"})],
+      CELL(P([R(`© ${new Date().getFullYear()} Minhtu Law Co., Ltd  ·  GPĐKHĐ: 79.2025.02.4764/TP/ĐKHĐ  ·  MST: 0318941023  ·  luatminhtu.vn`,{size:SZ.xs,color:"AABCCC"})],
              {align:AlignmentType.LEFT,before:80,after:80}),
         {w:wL,bg:NAVY,borders:B_NONE,margins:{top:60,bottom:60,left:180,right:100}}),
       CELL(P([R(ma_bao_gia,{bold:true,size:SZ.xs,color:NAVY})],{align:AlignmentType.CENTER,before:80,after:80}),

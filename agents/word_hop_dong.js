@@ -1,10 +1,7 @@
 /**
- * word_hop_dong.js — MTL Hợp Đồng Dịch Vụ Pháp Lý v2
- * Phiên bản: v2 — 10/05/2026
- * Thay đổi so với v1:
- *   • parseItems: hỗ trợ split theo `;` và line break (handle phạm vi 1 dòng dài)
- *   • Tách Điều 3 và Điều 4 thành 2 bảng riêng (Bên A / Bên B)
- *   • Điều 3 không còn trống
+ * word_hop_dong.js — MTL Hợp Đồng Dịch Vụ Pháp Lý v1
+ * Format: Giống hệt word_bao_gia.js (Navy/Gold, same section headers)
+ * Nội dung: 8 Điều khoản theo mẫu Lê Đức Dược
  *
  * Usage: node agents/word_hop_dong.js input.json output.docx
  *
@@ -41,16 +38,9 @@ const {
   thoi_han       = "Đến khi hoàn thành vụ việc",
   ngay_lap       = new Date().toLocaleDateString("vi-VN"),
   noi_dung       = "",
-  chi_nhanh      = "Trụ sở — TP. Hồ Chí Minh",
 } = D;
 
-// ── COLORS ──────────────────────────────────────────────
-const CN_DIA_CHI = {
-  "Trụ sở — TP. Hồ Chí Minh": "4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, Q.3, TP.HCM",
-  "Chi nhánh Đà Nẵng":         "81 Xô Viết Nghệ Tĩnh, P. Cẩm Lệ, TP. Đà Nẵng",
-  "Chi nhánh Sài Gòn":         "TP. Hồ Chí Minh",
-};
-const dia_chi_lap = CN_DIA_CHI[chi_nhanh] || "4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, Q.3, TP.HCM";
+// ── COLORS (giống word_bao_gia.js) ──────────────────────
 const NAVY  = "1B4A7A";
 const NAVY2 = "163D66";
 const GOLD  = "B8973A";
@@ -61,7 +51,8 @@ const BG2   = "EBF2FA";
 const BG3   = "FAF5E8";
 const WHITE = "FFFFFF";
 const FONT  = "Times New Roman";
-const SZ = { xs:13,sm:14,sm2:15,md:16,md2:17,lg:19,xl:21,xxl:26,hero:30 };
+// Đơn vị = nửa point (half-point). md:24 = 12pt — cỡ chữ tiêu chuẩn, dễ đọc cho người lớn tuổi.
+const SZ = { xs:18,sm:20,sm2:21,md:24,md2:26,lg:28,xl:30,xxl:34,hero:40 };
 const PW = 9360;
 
 // ── UTILS ───────────────────────────────────────────────
@@ -83,23 +74,14 @@ function chu(n) {
   return s[0].toUpperCase()+s.slice(1);
 }
 
-// ✅ v2: parseItems cải tiến — hỗ trợ \n và `;`
+// Parse pham_vi / noi_dung thành list items
 function parseItems(text) {
   if (!text) return [];
-  // Bước 1: split theo line break trước
-  let lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-  // Bước 2: nếu chỉ 1 dòng dài và có `;`, split tiếp theo `;`
-  if (lines.length === 1 && lines[0].length > 60 && lines[0].includes(";")) {
-    lines = lines[0].split(";").map(l => l.trim()).filter(Boolean);
-  }
-  // Bước 3: clean prefix (-, –, •, 01., 1., etc.)
-  return lines
-    .map(l => l.replace(/^[\-–•]\s*/, "")
-                .replace(/^\d+[.)]\s*/, "")
-                .trim())
-    .filter(Boolean);
+  return text.split("\n").map(l=>l.trim()).filter(Boolean)
+    .map(l=>l.replace(/^[-–•]\s*/,"").trim()).filter(Boolean);
 }
 
+// Parse payment milestones từ phuong_thuc_tt
 function parseMilestones(total, pttt) {
   const t = (pttt||"").toLowerCase();
   if (t.includes("100%") || t.includes("toàn bộ") || t.includes("một lần")) {
@@ -113,6 +95,7 @@ function parseMilestones(total, pttt) {
       { n:"2", mile:"Hoàn tất vụ việc", trigger:"Sau khi hoàn tất và bàn giao kết quả.", amt:total-p1, pct:"30%" },
     ];
   }
+  // Mặc định 50/50
   const p1=Math.round(total*0.5);
   return [
     { n:"1", mile:"Ký hợp đồng", trigger:"Ngay sau khi ký Hợp đồng Dịch vụ Pháp lý.", amt:p1, pct:"50%" },
@@ -121,7 +104,7 @@ function parseMilestones(total, pttt) {
 }
 
 function loadImg(names) {
-  const dirs=[path.join(__dirname,"mau"),"data/mau",path.join(__dirname,"../data/mau")];
+  const dirs=["data/mau",path.join(__dirname,"../data/mau")];
   for(const d of dirs) for(const n of names){
     const p=path.join(d,n);
     if(fs.existsSync(p)){const ext=path.extname(n).slice(1).toLowerCase();return{buf:fs.readFileSync(p),type:ext==="jpg"?"jpg":"png"};}
@@ -159,6 +142,7 @@ const CELL=(children,{w,bg,borders=B_CELL,vAlign=VerticalAlign.CENTER,margins=M}
     verticalAlign:vAlign,margins,borders,
   });
 
+// Section header — giống hoàn toàn word_bao_gia.js
 const SECT=(vi,en)=>new Table({
   width:{size:PW,type:WidthType.DXA},columnWidths:[PW],
   rows:[new TableRow({children:[
@@ -169,17 +153,21 @@ const SECT=(vi,en)=>new Table({
   borders:TB_NONE,
 });
 
+// Điều khoản title (trong body)
 const DIEU=(num,title)=>P([
   R(num+". ",{bold:true,size:SZ.lg,color:NAVY}),
   R(title.toUpperCase(),{bold:true,size:SZ.lg,color:NAVY}),
 ],{before:160,after:60,align:AlignmentType.LEFT});
 
+// Sub-heading trong điều khoản
 const SUB=(text)=>P([R(text,{bold:true,size:SZ.md,color:NAVY})],{before:80,after:30});
 
+// Bullet
 const BUL=(text,{bold=false,color=SLATE}={})=>
   P([R("–  ",{size:SZ.md,color:GOLD}),R(text,{size:SZ.md,color,bold})],
     {before:30,after:30,indent:240});
 
+// Căn cứ
 const CANCU=(text)=>P([R("–  ",{size:SZ.md,color:GOLD}),R(text,{size:SZ.md,color:SLATE,italic:true})],
   {before:20,after:20,indent:180});
 
@@ -229,7 +217,7 @@ function t1_confidential(){
 }
 
 // ────────────────────────────────────────────────────────
-// T2: STAT BOXES
+// T2: STAT BOXES — 4 ô (Bên B / Dịch vụ / Số HĐ / Phí)
 // ────────────────────────────────────────────────────────
 function t2_statBoxes(F){
   const w0=Math.floor(PW/4),wL=PW-w0*3;
@@ -257,17 +245,19 @@ function t2_statBoxes(F){
 }
 
 // ────────────────────────────────────────────────────────
-// T3: THÔNG TIN CÁC BÊN
+// T3: THÔNG TIN CÁC BÊN (full-width 2-col)
 // ────────────────────────────────────────────────────────
 function t3_parties(){
   const wL=Math.round(PW/2),wR=PW-wL;
   return new Table({
     width:{size:PW,type:WidthType.DXA},columnWidths:[wL,wR],
     rows:[new TableRow({children:[
+      // BÊN A
       CELL([
         P([R("BÊN A — BÊN CUNG CẤP DỊCH VỤ",{bold:true,size:SZ.md,color:WHITE})],
           {align:AlignmentType.CENTER,before:60,after:60}),
       ],{w:wL,bg:NAVY,borders:B_NONE,margins:{top:60,bottom:60,left:120,right:60}}),
+      // BÊN B
       CELL([
         P([R("BÊN B — BÊN SỬ DỤNG DỊCH VỤ",{bold:true,size:SZ.md,color:WHITE})],
           {align:AlignmentType.CENTER,before:60,after:60}),
@@ -282,9 +272,9 @@ function t3b_partiesDetail(){
 
   const benA=[
     P([R("CÔNG TY LUẬT TNHH MINH TÚ",{bold:true,size:SZ.lg,color:NAVY})],{before:100,after:10,align:AlignmentType.LEFT}),
-    P([R("Số GPĐKHĐ: ",{bold:true,size:SZ.md,color:SLATE}),R("41.02.4764/TP/ĐKHĐ",{size:SZ.md,color:SLATE})],{before:0,after:6,align:AlignmentType.LEFT}),
+    P([R("Số GPĐKHĐ: ",{bold:true,size:SZ.md,color:SLATE}),R("79.2025.02.4764/TP/ĐKHĐ",{size:SZ.md,color:SLATE})],{before:0,after:6,align:AlignmentType.LEFT}),
     P([R("MST: ",{bold:true,size:SZ.md,color:SLATE}),R("0318941023",{size:SZ.md,color:SLATE})],{before:0,after:6,align:AlignmentType.LEFT}),
-    P([R("Địa chỉ: ",{bold:true,size:SZ.md,color:SLATE}),R("4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, Q.3, TP.HCM",{size:SZ.md,color:SLATE})],{before:0,after:6,align:AlignmentType.LEFT}),
+    P([R("Địa chỉ: ",{bold:true,size:SZ.md,color:SLATE}),R("4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, TP.HCM",{size:SZ.md,color:SLATE})],{before:0,after:6,align:AlignmentType.LEFT}),
     P([R("ĐT: ",{bold:true,size:SZ.md,color:SLATE}),R("1900 0031  |  Email: votu@luatminhtu.vn",{size:SZ.md,color:SLATE})],{before:0,after:10,align:AlignmentType.LEFT}),
     P([R("Đại diện: ",{bold:true,size:SZ.md,color:NAVY}),R("Ông Võ Hồng Tú",{bold:true,size:SZ.md,color:NAVY})],{before:0,after:4,align:AlignmentType.LEFT}),
     P([R("Chức vụ: Giám đốc / Luật sư điều hành",{size:SZ.md,color:SLATE,italic:true})],{before:0,after:100,align:AlignmentType.LEFT}),
@@ -331,13 +321,13 @@ function t4_canCu(){
 }
 
 // ────────────────────────────────────────────────────────
-// T5: NỘI DUNG 8 ĐIỀU KHOẢN  (v2: tách Điều 3 và 4)
+// T5: NỘI DUNG 8 ĐIỀU KHOẢN
 // ────────────────────────────────────────────────────────
 function t5_articles(F){
   const scope_items = parseItems(pham_vi||noi_dung).slice(0,10);
   const milestones  = parseMilestones(F.total, phuong_thuc_tt);
 
-  // ── ĐIỀU 2: Bảng phí ──────────────────────────────────
+  // ── ĐIỀU 2: Bảng phí + lịch thanh toán ──────────────
   const W0=Math.round(PW*0.50),W1=Math.round(PW*0.22),W2=Math.round(PW*0.14),W3=PW-W0-W1-W2;
 
   const feeHdr=new TableRow({children:[
@@ -387,15 +377,17 @@ function t5_articles(F){
   });
   const pmTable=new Table({width:{size:PW,type:WidthType.DXA},columnWidths:[PM0,PM1,PM2,PM3,PM4],rows:[pmHdr,...pmRows],borders:TB_NONE});
 
-  // ── ✅ v2: Bảng Bên A (riêng cho Điều 3) ─────────────
+  // ── ĐIỀU 3 & 4: Bảng 2 cột quyền & nghĩa vụ ─────────
   const wH=Math.round(PW/2);
-  const dutyTableA=new Table({
+  const dutyTable=new Table({
     width:{size:PW,type:WidthType.DXA},columnWidths:[wH,PW-wH],
     rows:[
+      // Header
       new TableRow({children:[
         CELL(P([R("BÊN A — Nghĩa vụ",{bold:true,size:SZ.md,color:WHITE})],{align:AlignmentType.CENTER,before:60,after:60}),{w:wH,bg:NAVY,borders:B_NONE}),
         CELL(P([R("BÊN A — Quyền",{bold:true,size:SZ.md,color:WHITE})],{align:AlignmentType.CENTER,before:60,after:60}),{w:PW-wH,bg:NAVY2,borders:B_NONE}),
       ]}),
+      // Content Bên A
       new TableRow({children:[
         CELL([
           BUL("Thực hiện công việc đúng chất lượng, khối lượng và thời hạn cam kết."),
@@ -412,18 +404,12 @@ function t5_articles(F){
           BUL("Đơn phương chấm dứt hợp đồng và yêu cầu bồi thường nếu Bên B vi phạm nghiêm trọng."),
         ],{w:PW-wH,bg:BG2,borders:B_CELL,vAlign:VerticalAlign.TOP,margins:{top:80,bottom:80,left:80,right:120}}),
       ]}),
-    ],
-    borders:TB_NONE,
-  });
-
-  // ── ✅ v2: Bảng Bên B (riêng cho Điều 4) ─────────────
-  const dutyTableB=new Table({
-    width:{size:PW,type:WidthType.DXA},columnWidths:[wH,PW-wH],
-    rows:[
+      // Header Bên B
       new TableRow({children:[
         CELL(P([R("BÊN B — Nghĩa vụ",{bold:true,size:SZ.md,color:WHITE})],{align:AlignmentType.CENTER,before:60,after:60}),{w:wH,bg:NAVY,borders:B_NONE}),
         CELL(P([R("BÊN B — Quyền",{bold:true,size:SZ.md,color:WHITE})],{align:AlignmentType.CENTER,before:60,after:60}),{w:PW-wH,bg:NAVY2,borders:B_NONE}),
       ]}),
+      // Content Bên B
       new TableRow({children:[
         CELL([
           BUL("Cung cấp đầy đủ thông tin, tài liệu và phương tiện cần thiết cho Bên A."),
@@ -441,7 +427,7 @@ function t5_articles(F){
     borders:TB_NONE,
   });
 
-  // ── Nội dung các Điều khoản ──────────────────────────
+  // Nội dung các điều khoản còn lại (5–8)
   const clauses=[
     DIEU("Điều 1","Đối tượng của Hợp đồng"),
     P([R("Bên B đồng ý chọn Bên A là đơn vị tư vấn pháp lý và thực hiện các dịch vụ sau:",{size:SZ.md,color:SLATE})],{before:0,after:30}),
@@ -464,18 +450,13 @@ function t5_articles(F){
       R("Trường hợp không thực hiện được công việc ở đợt nào, Bên A hoàn tiền lại cho Bên B đợt đó, sau khi trừ chi phí thực tế đã phát sinh.",{size:SZ.sm2,color:SLATE,italic:true}),
     ],{before:30,after:60}),
     P([R("Bên B thanh toán bằng tiền mặt hoặc chuyển khoản:",{size:SZ.md,color:SLATE})],{before:0,after:10}),
-    BUL("Tên TK: CTY LUAT TNHH MINH TU  |  STK: 5150056789"),
+    BUL("Tên TK: CTY LUAT TNHH MINH TU  |  STK: 5158856789"),
     BUL("Ngân hàng MB Bank (TMCP Quân Đội) — Chi nhánh Phú Nhuận, TP.HCM"),
     P([R("Sau 03 ngày làm việc kể từ khi nhận đủ phí, Bên A xuất hóa đơn VAT theo quy định.",{size:SZ.md,color:SLATE,italic:true})],{before:10,after:60}),
 
-    // ✅ v2: Điều 3 và Điều 4 tách riêng — mỗi Điều có bảng riêng
     DIEU("Điều 3","Quyền và nghĩa vụ của Bên A"),
-    dutyTableA,
-    ...GAP(1),
-
     DIEU("Điều 4","Quyền và nghĩa vụ của Bên B"),
-    dutyTableB,
-    ...GAP(1),
+    dutyTable,
 
     DIEU("Điều 5","Thời hạn"),
     P([R(`Thời hạn thực hiện hợp đồng: `,{size:SZ.md,color:SLATE}),R(thoi_han,{bold:true,size:SZ.md,color:NAVY}),R(". Trong trường hợp kéo dài, hai bên thỏa thuận bằng phụ lục hợp đồng.",{size:SZ.md,color:SLATE})],{before:0,after:60}),
@@ -492,7 +473,7 @@ function t5_articles(F){
 
     DIEU("Điều 8","Cam kết chung"),
     P([R("Trước khi ký Hợp đồng này, các Bên đã tìm hiểu kỹ về tư cách, thẩm quyền, năng lực của nhau. Các Bên ký Hợp đồng trong trạng thái hoàn toàn tự nguyện, tự do ý chí, không bị ép buộc.",{size:SZ.md,color:SLATE})],{before:0,after:20}),
-    P([R("Hợp đồng được lập tại "+dia_chi_lap+", thành 03 bản chính tiếng Việt có giá trị pháp lý như nhau, Bên A giữ 02 bản, Bên B giữ 01 bản.",{size:SZ.md,color:SLATE})],{before:0,after:60}),
+    P([R("Hợp đồng được lập tại 4/9 Đường số 3, Cư Xá Đô Thành, P. Bàn Cờ, TP.HCM, thành 02 bản chính tiếng Việt có giá trị pháp lý như nhau, mỗi Bên giữ 01 bản.",{size:SZ.md,color:SLATE})],{before:0,after:60}),
   ];
 
   return new Table({
@@ -521,7 +502,7 @@ function t6_banking(F){
     P([R("Tên tài khoản:",{bold:true,size:SZ.md,color:NAVY})],{before:80,after:8,align:AlignmentType.LEFT}),
     P([R("CTY LUAT TNHH MINH TU",{bold:true,size:SZ.lg,color:NAVY})],{before:0,after:14,align:AlignmentType.LEFT}),
     P([R("Số tài khoản:",{bold:true,size:SZ.md,color:NAVY})],{before:0,after:8,align:AlignmentType.LEFT}),
-    P([R("5150056789",{bold:true,size:SZ.xxl,color:NAVY})],{before:0,after:14,align:AlignmentType.LEFT}),
+    P([R("5158856789",{bold:true,size:SZ.xxl,color:NAVY})],{before:0,after:14,align:AlignmentType.LEFT}),
     P([R("Ngân hàng: MB Bank (TMCP Quân Đội)",{bold:true,size:SZ.md,color:NAVY})],{before:0,after:4,align:AlignmentType.LEFT}),
     P([R("Chi nhánh Phú Nhuận, TP.HCM",{size:SZ.md,color:SLATE})],{before:0,after:14,align:AlignmentType.LEFT}),
     P([R("Nội dung CK: ",{bold:true,size:SZ.md,color:NAVY}),R(`[Họ tên]  —  Phí DV  —  ${so_hop_dong}`,{size:SZ.md,color:SLATE})],{before:0,after:14,align:AlignmentType.LEFT}),
@@ -535,7 +516,7 @@ function t6_banking(F){
   }
   rightCh.push(
     P([R("VietQR  ·  MB Bank",{bold:true,size:SZ.sm2,color:NAVY})],{align:AlignmentType.CENTER,before:14,after:4}),
-    P([R("STK: 5150056789",{size:SZ.md,color:SLATE})],{align:AlignmentType.CENTER,before:0,after:80}),
+    P([R("STK: 5158856789",{size:SZ.md,color:SLATE})],{align:AlignmentType.CENTER,before:0,after:80}),
   );
   return new Table({
     width:{size:PW,type:WidthType.DXA},columnWidths:[wL,wR],
@@ -545,7 +526,7 @@ function t6_banking(F){
 }
 
 // ────────────────────────────────────────────────────────
-// T7: KÝ KẾT
+// T7: KÝ KẾT 2 BÊN
 // ────────────────────────────────────────────────────────
 function t7_signing(){
   const wH=Math.round(PW/2);
@@ -555,7 +536,7 @@ function t7_signing(){
     P([R("☐  Tôi đã đọc và đồng ý toàn bộ nội dung Hợp đồng.",{size:SZ.md,color:SLATE})],{before:0,after:20,indent:60}),
     ...extra,
     P([R("Ngày: ______ / ______ / __________",{size:SZ.md,color:SLATE})],{before:20,after:80,align:AlignmentType.CENTER}),
-    ...Array.from({length:4},()=>P([R("",{})],{before:0,after:0})),
+    ...Array.from({length:4},()=>P([R("",{})],{before:0,after:0})),  // space for signature
     P([R(name,{bold:true,size:SZ.lg,color:NAVY})],{before:0,after:4,align:AlignmentType.CENTER}),
     P([R(role,{size:SZ.md,color:SLATE,italic:true})],{before:0,after:100,align:AlignmentType.CENTER}),
   ];
@@ -584,10 +565,10 @@ function t8_footer(){
   return new Table({
     width:{size:PW,type:WidthType.DXA},columnWidths:[wL,wR],
     rows:[new TableRow({children:[
-      CELL(P([R(`© ${new Date().getFullYear()} Minhtu Law Co., Ltd  ·  GPĐKHĐ: 41.02.4764/TP/ĐKHĐ  ·  MST: 0318941023  ·  luatminhtu.vn`,{size:SZ.xs,color:"AABCCC"})],
+      CELL(P([R(`© ${new Date().getFullYear()} Minhtu Law Co., Ltd  ·  GPĐKHĐ: 79.2025.02.4764/TP/ĐKHĐ  ·  MST: 0318941023  ·  luatminhtu.vn`,{size:SZ.xs,color:"AABCCC"})],
              {align:AlignmentType.LEFT,before:80,after:80}),
         {w:wL,bg:NAVY,borders:B_NONE,margins:{top:60,bottom:60,left:180,right:100}}),
-      CELL(P([R(chi_nhanh+"  ·  "+so_hop_dong,{bold:true,size:SZ.xs,color:NAVY})],{align:AlignmentType.CENTER,before:80,after:80}),
+      CELL(P([R(so_hop_dong,{bold:true,size:SZ.xs,color:NAVY})],{align:AlignmentType.CENTER,before:80,after:80}),
         {w:wR,bg:GOLD,borders:B_NONE}),
     ]})],
     borders:TB_NONE,
